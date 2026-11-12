@@ -8,7 +8,7 @@ spring:
     # 루트의 .env(docker-compose와 같은 파일)를 읽는다. 같은 이름의 OS 환경 변수가 있으면 그쪽이 우선한다.
     import: optional:file:.env[.properties]
   datasource:
-    url: ${DB_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:staybook}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    url: ${DB_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:staybook}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false}
     username: ${DB_USERNAME:}
     password: ${DB_PASSWORD:}
   jpa:
@@ -25,7 +25,7 @@ spring:
       password: ${REDIS_PASSWORD:}
   mail:
     # MAIL_HOST가 비어 있으면 실제 발송 없이 동작한다 (발송 구현은 2단계 auth에서 연결).
-    host: ${MAIL_HOST:}
+    host: #${MAIL_HOST:}
     port: ${MAIL_PORT:587}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
