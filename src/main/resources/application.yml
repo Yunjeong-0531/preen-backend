@@ -1,0 +1,92 @@
+spring:
+  application:
+    name: staybook
+  autoconfigure:
+    # 로그인은 JWT로만 한다. 쓰지 않는 기본 계정(user)과 임시 비밀번호가 만들어지지 않게 끈다.
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  config:
+    # 루트의 .env(docker-compose와 같은 파일)를 읽는다. 같은 이름의 OS 환경 변수가 있으면 그쪽이 우선한다.
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:staybook}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate          # 스키마 변경은 Flyway 마이그레이션으로만 한다
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  mail:
+    # MAIL_HOST가 비어 있으면 실제 발송 없이 동작한다 (발송 구현은 2단계 auth에서 연결).
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+staybook:
+  jwt:
+    secret: ${JWT_SECRET}                       # 32바이트 이상
+    access-token-ttl: 30m
+    refresh-token-ttl: 14d
+  crypto:
+    encryption-key: ${CRYPTO_ENCRYPTION_KEY}    # Base64로 인코딩한 32바이트 키 (AES-256)
+    hash-key: ${CRYPTO_HASH_KEY}                # email_hash, phone_hash용 HMAC 키
+  mail:
+    from: ${MAIL_FROM:no-reply@staybook.local}    # 보내는 사람 주소
+  auth:
+    max-failed-logins: 5              # 연속 실패가 이 횟수에 이르면 잠근다
+    lock-duration: 15m
+    verification-code-ttl: 5m
+    verification-max-attempts: 5
+    verified-email-valid-for: 30m     # 이메일 인증 후 이 시간 안에 가입해야 한다
+    password-reset-token-ttl: 30m
+    password-reset-url: ${PASSWORD_RESET_URL:http://localhost:3000/reset-password}
+  inventory:
+    generate-days: 90                 # 재고 자동 생성 범위 (오늘부터 N일 뒤까지)
+    default-total-count: 1            # 재고가 하나도 없는 객실에 처음 만들 때의 수량
+    generate-cron: "0 10 3 * * *"     # 매일 03:10 (Asia/Seoul)
+  reservation:
+    hold-duration: 10m                # 예약 생성 후 결제를 마쳐야 하는 시간
+    expire-interval: 60000            # 선점 만료 검사 주기 (ms)
+    complete-cron: "0 20 0 * * *"     # 투숙 완료 처리, 매일 00:20 (Asia/Seoul)
+  pg:
+    provider: ${PG_PROVIDER:toss}     # toss(실제 PG) 또는 fake(테스트·로컬 개발용)
+    secret-key: ${PG_SECRET_KEY:}
+    webhook-secret: ${PG_WEBHOOK_SECRET:}
+  spotify:
+    client-id: ${SPOTIFY_CLIENT_ID:}
+    client-secret: ${SPOTIFY_CLIENT_SECRET:}
+  oauth:
+    kakao:
+      client-id: ${KAKAO_CLIENT_ID:}
+      client-secret: ${KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:3000/oauth/kakao/callback}
+    naver:
+      client-id: ${NAVER_CLIENT_ID:}
+      client-secret: ${NAVER_CLIENT_SECRET:}
+      redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:3000/oauth/naver/callback}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  scheduling:
+    enabled: true
+  storage:
+    local-root-dir: ${STORAGE_LOCAL_DIR:./uploads}
+    base-url: ${STORAGE_BASE_URL:http://localhost:8080}
+    max-image-size: 5MB
