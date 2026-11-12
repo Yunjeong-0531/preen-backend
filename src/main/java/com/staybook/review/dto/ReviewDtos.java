@@ -65,4 +65,18 @@ public final class ReviewDtos {
             LocalDateTime createdAt
     ) {
     }
+
+    /**
+     * 숙소별 트랙 목록의 한 곡. 같은 곡이 여러 리뷰에 붙었으면 한 번만 나온다.
+     *
+     * @param spotifyTrackId 프론트가 공식 임베드 플레이어(open.spotify.com/embed/track/{id})로 표시한다
+     * @param reviewCount    이 곡을 붙인 노출 리뷰 수
+     * @param lastAddedAt    이 곡이 붙은 가장 최근 리뷰의 작성 시각
+     */
+    public record TrackResponse(
+            String spotifyTrackId,
+            long reviewCount,
+            LocalDateTime lastAddedAt
+    ) {
+    }
 }

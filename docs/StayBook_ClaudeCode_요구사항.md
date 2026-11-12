@@ -239,6 +239,7 @@ auth, terms → user
 | 경로 | 기능 |
 |---|---|
 | `GET /api/accommodations/{id}/reviews` | 숙소 리뷰 목록 |
+| `GET /api/accommodations/{id}/tracks` | 숙소별 트랙 목록 (노출 리뷰에 붙은 곡, 중복 제거, 최근순, 최대 50곡) |
 | `POST /api/reviews`, `PATCH/DELETE /api/reviews/{id}` | 작성, 수정, 삭제 |
 | `POST /api/host/reviews/{id}/reply` | 호스트 답글 |
 | `GET /api/spotify/tracks/search?q=` | 트랙 검색 (로그인 필요) |

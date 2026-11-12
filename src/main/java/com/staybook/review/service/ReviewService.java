@@ -10,6 +10,7 @@ import com.staybook.review.domain.ReviewImage;
 import com.staybook.review.dto.ReviewDtos.CreateRequest;
 import com.staybook.review.dto.ReviewDtos.ReplyRequest;
 import com.staybook.review.dto.ReviewDtos.ReviewResponse;
+import com.staybook.review.dto.ReviewDtos.TrackResponse;
 import com.staybook.review.dto.ReviewDtos.UpdateRequest;
 import com.staybook.review.exception.ReviewErrorCode;
 import com.staybook.review.repository.ReviewImageRepository;
@@ -33,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewService {
 
     private static final int MAX_PAGE_SIZE = 50;
+    private static final int MAX_TRACKS = 50;
 
     private final ReviewRepository reviewRepository;
     private final ReviewImageRepository reviewImageRepository;
@@ -56,6 +58,15 @@ public class ReviewService {
                 .collect(Collectors.groupingBy(ReviewImage::getReviewId,
                         Collectors.mapping(ReviewImage::getImageUrl, Collectors.toList())));
         return PageResponse.from(reviews, r -> toResponse(r, images.getOrDefault(r.getId(), List.of())));
+    }
+
+    /** 숙소별 트랙 목록. 노출 리뷰에 붙은 곡을 중복 없이, 최근에 붙은 곡부터 최대 MAX_TRACKS곡. */
+    @Transactional(readOnly = true)
+    public List<TrackResponse> getTracksForAccommodation(Long accommodationId) {
+        if (!accommodationQueryService.existsListed(accommodationId)) {
+            throw new BaseException(ReviewErrorCode.ACCOMMODATION_NOT_FOUND);
+        }
+        return reviewRepository.findTracks(accommodationId, Review.Status.VISIBLE, PageRequest.of(0, MAX_TRACKS));
     }
 
     /** 작성 조건: 본인 예약, 예약 상태 COMPLETED, 예약당 1건. */

@@ -278,6 +278,68 @@ class ReviewFavoriteTest extends IntegrationTestSupport {
         mockMvc.perform(get(path)).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("REVIEW-006"));
     }
 
+    // ---------- 숙소별 트랙 목록 ----------
+
+    @Test
+    void 숙소_트랙_목록은_곡별로_묶이고_최근에_붙은_곡부터_나오며_숨긴_리뷰는_빠진다() throws Exception {
+        String trackA = TRACK_ID;
+        String trackB = "7qiZfU4dY1lWllzX7mPBI3";
+        Member host = createHost();
+        LocalDate checkIn = today.plusDays(10);
+        Listing listing = createListedAccommodation(host, SEOUL);
+        setInventory(host, listing.roomId(), checkIn, checkIn, 5, 100000);
+        // 리뷰 순서: A, B, A, 음악 없음
+        String[] tracks = {trackA, trackB, trackA, null};
+        long[] reviewIds = new long[tracks.length];
+        for (int i = 0; i < tracks.length; i++) {
+            Member guest = createMember();
+            JsonNode reservation = reserveOk(guest, listing.roomId(), checkIn, checkIn.plusDays(1), 2);
+            pay(guest, reservation);
+            jdbc.update("update reservations set check_in = ?, check_out = ? where id = ?",
+                    today.minusDays(2), today.minusDays(1), reservation.get("id").asLong());
+            reservationService.completeStays();
+            Map<String, Object> review = tracks[i] == null
+                    ? body("reservationId", reservation.get("id").asLong(), "rating", 4, "content", "좋았어요.")
+                    : body("reservationId", reservation.get("id").asLong(), "rating", 4, "content", "좋았어요.",
+                    "spotifyTrackId", tracks[i]);
+            reviewIds[i] = data(postJson("/api/reviews", review, guest.token())
+                    .andExpect(status().isOk())).get("id").asLong();
+        }
+        String path = "/api/accommodations/" + listing.accommodationId() + "/tracks";
+
+        // 토큰 없이 조회. 같은 곡은 한 번만, 가장 최근 리뷰에 붙은 A가 먼저
+        mockMvc.perform(get(path))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].spotifyTrackId").value(trackA))
+                .andExpect(jsonPath("$.data[0].reviewCount").value(2))
+                .andExpect(jsonPath("$.data[0].lastAddedAt").exists())
+                .andExpect(jsonPath("$.data[1].spotifyTrackId").value(trackB))
+                .andExpect(jsonPath("$.data[1].reviewCount").value(1));
+
+        // 세 번째 리뷰(A)를 숨기면 A는 첫 리뷰 하나만 남아 B 뒤로 간다
+        jdbc.update("update reviews set status = 'HIDDEN' where id = ?", reviewIds[2]);
+        mockMvc.perform(get(path))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].spotifyTrackId").value(trackB))
+                .andExpect(jsonPath("$.data[1].spotifyTrackId").value(trackA))
+                .andExpect(jsonPath("$.data[1].reviewCount").value(1));
+
+        // 공개되지 않은 숙소와 없는 숙소는 404
+        patchJson("/api/host/accommodations/" + listing.accommodationId() + "/listing-status",
+                body("listingStatus", "HIDDEN"), host.token()).andExpect(status().isOk());
+        mockMvc.perform(get(path)).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("REVIEW-006"));
+        mockMvc.perform(get("/api/accommodations/999999999/tracks")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 음악이_붙은_리뷰가_없으면_빈_목록이다() throws Exception {
+        Listing listing = createListedAccommodation(createHost(), SEOUL);
+        mockMvc.perform(get("/api/accommodations/" + listing.accommodationId() + "/tracks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
     // ---------- 찜 ----------
 
     @Test

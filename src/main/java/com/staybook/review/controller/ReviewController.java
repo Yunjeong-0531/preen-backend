@@ -6,9 +6,11 @@ import com.staybook.common.security.AuthUser;
 import com.staybook.review.dto.ReviewDtos.CreateRequest;
 import com.staybook.review.dto.ReviewDtos.ReplyRequest;
 import com.staybook.review.dto.ReviewDtos.ReviewResponse;
+import com.staybook.review.dto.ReviewDtos.TrackResponse;
 import com.staybook.review.dto.ReviewDtos.UpdateRequest;
 import com.staybook.review.service.ReviewService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -33,6 +35,12 @@ public class ReviewController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok(reviewService.getForAccommodation(id, page, size));
+    }
+
+    /** 숙소별 트랙 목록(리뷰에 붙은 음악 모음). 토큰 없이 접근한다. */
+    @GetMapping("/api/accommodations/{id}/tracks")
+    public ApiResponse<List<TrackResponse>> getTracksForAccommodation(@PathVariable Long id) {
+        return ApiResponse.ok(reviewService.getTracksForAccommodation(id));
     }
 
     @PostMapping("/api/reviews")
