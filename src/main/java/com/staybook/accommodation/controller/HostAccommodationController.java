@@ -14,7 +14,6 @@ import com.staybook.common.security.AuthUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,11 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class HostAccommodationController {
 
     private final HostAccommodationService hostAccommodationService;
-
-    @GetMapping
-    public ApiResponse<java.util.List<AccommodationDetail>> getMyAccommodations(@AuthenticationPrincipal AuthUser authUser) {
-        return ApiResponse.ok(hostAccommodationService.getMyAccommodations(authUser.userId()));
-    }
 
     @PostMapping
     public ApiResponse<AccommodationDetail> create(@AuthenticationPrincipal AuthUser authUser,

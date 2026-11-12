@@ -61,15 +61,6 @@ public class HostAccommodationService {
 
     // ---------- 숙소 ----------
 
-    /** 호스트 본인이 등록한 숙소 목록 조회 (UNLISTED 포함) */
-    @Transactional(readOnly = true)
-    public List<AccommodationDetail> getMyAccommodations(Long userId) {
-        Long businessId = hostService.getBusinessOf(userId).businessId();
-        return accommodationRepository.findByHostBusinessId(businessId).stream()
-                .map(a -> queryService.toDetail(a, false))
-                .toList();
-    }
-
     /** 숙소 등록. DRAFT로 만들어지고, 객실과 환불정책을 등록한 뒤 LISTED로 바꿔 공개한다. */
     public AccommodationDetail create(Long userId, AccommodationCreateRequest request) {
         Long businessId = hostService.getBusinessOf(userId).businessId();
