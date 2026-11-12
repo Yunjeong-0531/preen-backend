@@ -11,6 +11,7 @@ import com.staybook.accommodation.domain.RoomImage;
 import com.staybook.accommodation.dto.AccommodationDtos.AccommodationCreateRequest;
 import com.staybook.accommodation.dto.AccommodationDtos.AccommodationDetail;
 import com.staybook.accommodation.dto.AccommodationDtos.AccommodationUpdateRequest;
+import com.staybook.accommodation.dto.AccommodationDtos.HostAccommodationSummary;
 import com.staybook.accommodation.dto.AccommodationDtos.RefundPolicyRequest;
 import com.staybook.accommodation.dto.AccommodationDtos.RefundPolicyResponse;
 import com.staybook.accommodation.dto.AccommodationDtos.RefundRule;
@@ -39,7 +40,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 호스트의 숙소·객실·환불정책 관리. 모든 변경은 본인 소유인지 먼저 검사한다. */
+/** 호스트의 숙소·객실·환불정책 관리와 조회. 모든 요청은 본인 소유인지 먼저 검사한다. */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -93,13 +94,34 @@ public class HostAccommodationService {
         if (request.amenityIds() != null) {
             replaceAmenities(accommodationId, request.amenityIds());
         }
-        if (request.listingStatus() != null) {
-            if (request.listingStatus() == ListingStatus.LISTED) {
-                assertReadyToList(accommodationId);
-            }
-            accommodation.changeListingStatus(request.listingStatus());
-        }
         return queryService.toDetail(accommodation, false);
+    }
+
+    /**
+     * 공개 상태 변경. LISTED로 바꾸려면 판매 중인 객실과 환불정책이 있어야 한다.
+     * 숙소 행을 잠그고 검사해서, 동시에 마지막 객실을 판매 중지하는 요청과 엇갈리지 않게 한다.
+     */
+    public AccommodationDetail changeListingStatus(Long userId, Long accommodationId, ListingStatus listingStatus) {
+        Accommodation accommodation = loadOwnedForUpdate(accommodationId, userId);
+        if (listingStatus == ListingStatus.LISTED) {
+            assertReadyToList(accommodationId);
+        }
+        accommodation.changeListingStatus(listingStatus);
+        return queryService.toDetail(accommodation, false);
+    }
+
+    // ---------- 조회 ----------
+
+    /** 내 숙소 목록. DRAFT·LISTED·HIDDEN 모두. */
+    @Transactional(readOnly = true)
+    public List<HostAccommodationSummary> getMine(Long userId) {
+        return queryService.getHostSummaries(hostService.getBusinessOf(userId).businessId());
+    }
+
+    /** 내 숙소 상세. 공개 상태와 관계없이 조회하고, 판매 중지 객실도 포함한다. */
+    @Transactional(readOnly = true)
+    public AccommodationDetail getMyDetail(Long userId, Long accommodationId) {
+        return queryService.toDetail(loadOwned(accommodationId, userId), false);
     }
 
     // ---------- 객실 ----------
@@ -115,10 +137,19 @@ public class HostAccommodationService {
     }
 
     public RoomResponse updateRoom(Long userId, Long accommodationId, Long roomId, RoomUpdateRequest request) {
-        loadOwned(accommodationId, userId);
+        boolean deactivating = request.status() == Room.RoomStatus.INACTIVE;
+        Accommodation accommodation = deactivating
+                ? loadOwnedForUpdate(accommodationId, userId)
+                : loadOwned(accommodationId, userId);
         Room room = roomRepository.findById(roomId)
                 .filter(r -> r.getAccommodationId().equals(accommodationId))
                 .orElseThrow(() -> new BaseException(AccommodationErrorCode.ROOM_NOT_FOUND));
+
+        // 공개 중인 숙소에서 마지막 판매 객실을 끄면 공개됐는데 예약할 객실이 없는 숙소가 된다
+        if (deactivating && room.isActive() && accommodation.isListed()
+                && roomRepository.countByAccommodationIdAndStatus(accommodationId, Room.RoomStatus.ACTIVE) <= 1) {
+            throw new BaseException(AccommodationErrorCode.LAST_ACTIVE_ROOM);
+        }
 
         room.update(trim(request.name()), request.capacity(), request.maxCapacity(),
                 request.extraPersonFee(), request.nightlyPrice(), request.status());
@@ -161,8 +192,17 @@ public class HostAccommodationService {
 
     /** 호스트 API는 리소스가 본인 소유인지 반드시 검사한다. */
     private Accommodation loadOwned(Long accommodationId, Long userId) {
-        Accommodation accommodation = accommodationRepository.findById(accommodationId)
-                .orElseThrow(() -> new BaseException(AccommodationErrorCode.ACCOMMODATION_NOT_FOUND));
+        return assertOwner(accommodationRepository.findById(accommodationId)
+                .orElseThrow(() -> new BaseException(AccommodationErrorCode.ACCOMMODATION_NOT_FOUND)), userId);
+    }
+
+    /** 공개 상태나 판매 객실 수를 바꿀 때 쓴다. 숙소 행을 잠근다(FOR UPDATE). */
+    private Accommodation loadOwnedForUpdate(Long accommodationId, Long userId) {
+        return assertOwner(accommodationRepository.findByIdForUpdate(accommodationId)
+                .orElseThrow(() -> new BaseException(AccommodationErrorCode.ACCOMMODATION_NOT_FOUND)), userId);
+    }
+
+    private Accommodation assertOwner(Accommodation accommodation, Long userId) {
         if (!hostService.getBusinessOf(userId).businessId().equals(accommodation.getHostBusinessId())) {
             throw new BaseException(AccommodationErrorCode.NOT_OWNER);
         }

@@ -222,7 +222,7 @@ public abstract class IntegrationTestSupport {
                 .andExpect(status().isOk())).get("id").asLong();
         putJson("/api/host/accommodations/" + accommodationId + "/refund-policy", refundPolicyBody(), host.token())
                 .andExpect(status().isOk());
-        patchJson("/api/host/accommodations/" + accommodationId, body("listingStatus", "LISTED"), host.token())
+        patchJson("/api/host/accommodations/" + accommodationId + "/listing-status", body("listingStatus", "LISTED"), host.token())
                 .andExpect(status().isOk());
         return new Listing(accommodationId, roomId);
     }

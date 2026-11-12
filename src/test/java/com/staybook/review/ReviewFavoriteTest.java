@@ -273,7 +273,7 @@ class ReviewFavoriteTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.content[0].id").value(reviewIds[0]));
 
-        patchJson("/api/host/accommodations/" + listing.accommodationId(), body("listingStatus", "HIDDEN"),
+        patchJson("/api/host/accommodations/" + listing.accommodationId() + "/listing-status", body("listingStatus", "HIDDEN"),
                 host.token()).andExpect(status().isOk());
         mockMvc.perform(get(path)).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("REVIEW-006"));
     }
@@ -332,7 +332,7 @@ class ReviewFavoriteTest extends IntegrationTestSupport {
         getWith("/api/favorites/me", null).andExpect(status().isUnauthorized());
 
         // 찜한 뒤 호스트가 숨긴 숙소는 목록에서 빠진다
-        patchJson("/api/host/accommodations/" + second.accommodationId(), body("listingStatus", "HIDDEN"),
+        patchJson("/api/host/accommodations/" + second.accommodationId() + "/listing-status", body("listingStatus", "HIDDEN"),
                 host.token()).andExpect(status().isOk());
         getWith("/api/favorites/me", guest.token())
                 .andExpect(jsonPath("$.data.content.length()").value(1))

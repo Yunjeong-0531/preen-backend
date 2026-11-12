@@ -18,7 +18,9 @@ public enum AccommodationErrorCode implements ErrorCode {
     NOT_READY_TO_LIST(HttpStatus.BAD_REQUEST, "ACCOMMODATION-007",
             "판매 중인 객실과 환불정책을 등록해야 숙소를 공개할 수 있습니다."),
     DUPLICATE_REFUND_RULE(HttpStatus.BAD_REQUEST, "ACCOMMODATION-008", "같은 일수의 환불 규칙이 중복되었습니다."),
-    CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, "ACCOMMODATION-009", "존재하지 않는 카테고리입니다.");
+    CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, "ACCOMMODATION-009", "존재하지 않는 카테고리입니다."),
+    LAST_ACTIVE_ROOM(HttpStatus.CONFLICT, "ACCOMMODATION-010",
+            "공개 중인 숙소의 마지막 판매 객실은 중지할 수 없습니다. 숙소를 먼저 숨겨 주세요.");
 
     private final HttpStatus status;
     private final String code;

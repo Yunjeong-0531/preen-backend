@@ -42,7 +42,10 @@ public final class AccommodationDtos {
     ) {
     }
 
-    /** 보내지 않은(null) 항목은 바꾸지 않는다. imageUrls, amenityIds는 보내면 통째로 교체한다. */
+    /**
+     * 숙소 세부사항 수정. 보내지 않은(null) 항목은 바꾸지 않는다. imageUrls, amenityIds는 보내면 통째로 교체한다.
+     * 공개 상태는 여기서 바꾸지 않고 {@link ListingStatusRequest}로 바꾼다.
+     */
     public record AccommodationUpdateRequest(
             Long regionId,
             Long categoryId,
@@ -55,8 +58,13 @@ public final class AccommodationDtos {
             LocalTime checkOutTime,
             @Size(max = 20, message = "이미지는 20장까지 등록할 수 있습니다.")
             List<@NotBlank @Size(max = 500) String> imageUrls,
-            List<@NotNull Long> amenityIds,
-            ListingStatus listingStatus
+            List<@NotNull Long> amenityIds
+    ) {
+    }
+
+    /** 공개 상태 변경. LISTED로 바꾸려면 판매 중인 객실과 환불정책이 있어야 한다. */
+    public record ListingStatusRequest(
+            @NotNull(message = "공개 상태를 선택해 주세요.") ListingStatus listingStatus
     ) {
     }
 
@@ -155,6 +163,17 @@ public final class AccommodationDtos {
             List<RoomResponse> rooms,
             RefundPolicyResponse refundPolicy
     ) {
+    }
+
+    /**
+     * 호스트의 내 숙소 목록 한 줄. 공개 상태와 관계없이 모두 나온다.
+     *
+     * @param readyToList 판매 중인 객실과 환불정책이 있어 공개할 수 있는지
+     */
+    public record HostAccommodationSummary(Long id, String name, String address, Long regionId, String regionName,
+                                           Long categoryId, String categoryName, String thumbnailUrl,
+                                           ListingStatus listingStatus, int roomCount, int activeRoomCount,
+                                           boolean hasRefundPolicy, boolean readyToList) {
     }
 
     // ---------- 다른 feature용 ----------

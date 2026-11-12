@@ -160,11 +160,16 @@ auth, terms → user
 | `GET /api/regions`, `GET /api/amenities`, `GET /api/categories` | 지역, 편의시설, 카테고리 목록 |
 | `GET /api/accommodations` | 목록 검색 (지역 `regionId`, 카테고리 `categoryId`, 인원 `guestCount`, 페이지) |
 | `GET /api/accommodations/{id}` | 상세 (이미지, 편의시설, 객실, 환불정책) |
-| `POST/PATCH /api/host/accommodations` | 숙소 등록·수정 |
-| `POST/PATCH /api/host/accommodations/{id}/rooms` | 객실 등록·수정 |
+| `GET /api/host/accommodations` | 내 숙소 목록 (공개 상태와 관계없이 모두, 객실 수·공개 가능 여부 포함) |
+| `GET /api/host/accommodations/{id}` | 내 숙소 상세 (판매 중지 객실 포함) |
+| `POST/PATCH /api/host/accommodations` | 숙소 등록·세부사항 수정 (공개 상태는 바꾸지 않음) |
+| `PATCH /api/host/accommodations/{id}/listing-status` | 공개 상태 변경 (DRAFT·LISTED·HIDDEN) |
+| `POST/PATCH /api/host/accommodations/{id}/rooms` | 객실 등록·수정 (판매 중지 포함) |
 | `PUT /api/host/accommodations/{id}/refund-policy` | 환불정책 설정 |
 
 - 공개 조회에는 `listing_status = LISTED`인 숙소만 나온다.
+- LISTED로 바꾸려면 판매 중인(ACTIVE) 객실과 환불정책이 있어야 한다.
+- LISTED인 숙소의 마지막 ACTIVE 객실은 INACTIVE로 바꿀 수 없다. 숙소를 먼저 숨겨야 한다. 공개 전환과 객실 판매 중지는 숙소 행을 잠그고 검사한다.
 - 환불정책은 수정하지 않고 새 버전을 만들어 `active`를 옮긴다. 기존 예약이 과거 버전을 참조하기 때문이다.
 - 지역, 편의시설, 카테고리 초기 데이터는 마이그레이션으로 넣는다.
 - 숙소는 카테고리 하나에 속한다. 등록할 때 `categoryId`는 필수이고, 검색 조건은 함께 쓰면 모두 만족하는 숙소만 나온다.
@@ -174,6 +179,7 @@ auth, terms → user
 | 경로 | 기능 |
 |---|---|
 | `GET /api/accommodations/{id}/availability?checkIn&checkOut` | 객실별 예약 가능 여부와 기간 합계 요금 |
+| `GET /api/host/rooms/{roomId}/inventories?startDate&endDate` | 기간별 재고 조회 (수량, 예약·선점 수, 가격, 마감. 양 끝 포함, 최대 366일) |
 | `PUT /api/host/rooms/{roomId}/inventories` | 기간별 수량, 가격, 판매 마감 설정 |
 
 - 다른 feature용 서비스 메서드: `hold`, `confirm`, `release` (모두 예약 ID 기준).

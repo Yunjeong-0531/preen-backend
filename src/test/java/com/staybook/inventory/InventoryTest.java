@@ -197,6 +197,61 @@ class InventoryTest extends IntegrationTestSupport {
         assertThat(counts(listing.roomId(), day1)).isEqualTo("held=1,booked=1");
     }
 
+    // ---------- 호스트 재고 조회 ----------
+
+    @Test
+    void 호스트는_기간별_재고와_예약_선점_수를_조회한다() throws Exception {
+        Member host = createHost();
+        Listing listing = createListedAccommodation(host, SEOUL);
+        setInventory(host, listing.roomId(), day1, day2, 3, 100000, null);
+        setInventory(host, listing.roomId(), day2, day2, null, null, true);
+        long confirmed = newReservationId(listing);
+        inventoryService.hold(confirmed, listing.roomId(), day1, day2, expiry());
+        inventoryService.confirm(confirmed);
+        inventoryService.hold(newReservationId(listing), listing.roomId(), day1, day2, expiry());
+
+        // day3·day4는 재고 행이 없어 결과에 나오지 않는다
+        getWith("/api/host/rooms/" + listing.roomId() + "/inventories?startDate=" + day1 + "&endDate=" + day4,
+                host.token())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].stayDate").value(day1.toString()))
+                .andExpect(jsonPath("$.data[0].totalCount").value(3))
+                .andExpect(jsonPath("$.data[0].bookedCount").value(1))
+                .andExpect(jsonPath("$.data[0].heldCount").value(1))
+                .andExpect(jsonPath("$.data[0].closed").value(false))
+                .andExpect(jsonPath("$.data[1].stayDate").value(day2.toString()))
+                .andExpect(jsonPath("$.data[1].bookedCount").value(0))
+                .andExpect(jsonPath("$.data[1].closed").value(true));
+    }
+
+    @Test
+    void 재고_조회_입력과_권한_검증() throws Exception {
+        Member owner = createHost();
+        Member other = createHost();
+        Member guest = createMember();
+        Listing listing = createListedAccommodation(owner, SEOUL);
+        String path = "/api/host/rooms/" + listing.roomId() + "/inventories";
+        String range = "?startDate=" + day1 + "&endDate=" + day2;
+
+        getWith(path + "?startDate=" + day2 + "&endDate=" + day1, owner.token())
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVENTORY-002"));
+        getWith(path + "?startDate=" + day1 + "&endDate=" + day1.plusDays(400), owner.token())
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVENTORY-003"));
+        getWith(path + "?startDate=" + day1, owner.token()).andExpect(status().isBadRequest());
+        // 지난 날짜도 조회할 수 있다
+        getWith(path + "?startDate=" + LocalDate.now().minusDays(30) + "&endDate=" + day1, owner.token())
+                .andExpect(status().isOk());
+
+        getWith(path + range, other.token())
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCOMMODATION-002"));
+        getWith(path + range, guest.token())
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("COMMON-003"));
+        getWith(path + range, null).andExpect(status().isUnauthorized());
+        getWith("/api/host/rooms/999999999/inventories" + range, owner.token())
+                .andExpect(status().isNotFound());
+    }
+
     // ---------- 예약 가능 여부 조회 ----------
 
     @Test
@@ -253,7 +308,7 @@ class InventoryTest extends IntegrationTestSupport {
         mockMvc.perform(get(path).param("checkIn", day1.toString())).andExpect(status().isBadRequest());
 
         // 공개되지 않은 숙소는 없는 숙소다
-        patchJson("/api/host/accommodations/" + listing.accommodationId(), body("listingStatus", "HIDDEN"),
+        patchJson("/api/host/accommodations/" + listing.accommodationId() + "/listing-status", body("listingStatus", "HIDDEN"),
                 host.token()).andExpect(status().isOk());
         mockMvc.perform(get(path).param("checkIn", day1.toString()).param("checkOut", day2.toString()))
                 .andExpect(status().isNotFound());
@@ -442,6 +497,9 @@ class InventoryTest extends IntegrationTestSupport {
     void 판매_중지한_객실에는_재고를_만들지_않는다() throws Exception {
         Member host = createHost();
         Listing listing = createListedAccommodation(host, SEOUL);
+        // 공개 중인 숙소의 마지막 판매 객실은 끌 수 없으므로 숙소를 먼저 숨긴다
+        patchJson("/api/host/accommodations/" + listing.accommodationId() + "/listing-status",
+                body("listingStatus", "HIDDEN"), host.token()).andExpect(status().isOk());
         patchJson("/api/host/accommodations/" + listing.accommodationId() + "/rooms/" + listing.roomId(),
                 body("status", "INACTIVE"), host.token()).andExpect(status().isOk());
 

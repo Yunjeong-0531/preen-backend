@@ -101,7 +101,7 @@ class FullScenarioTest extends IntegrationTestSupport {
                 roomBody("오션뷰 더블", 2, 4, 20000, 100000), hostToken).andExpect(status().isOk())).get("id").asLong();
         putJson("/api/host/accommodations/" + accommodationId + "/refund-policy", refundPolicyBody(), hostToken)
                 .andExpect(status().isOk());
-        patchJson("/api/host/accommodations/" + accommodationId, body("listingStatus", "LISTED"), hostToken)
+        patchJson("/api/host/accommodations/" + accommodationId + "/listing-status", body("listingStatus", "LISTED"), hostToken)
                 .andExpect(status().isOk());
 
         // 재고 설정: 6일 동안 하루 1개, 1박 10만원

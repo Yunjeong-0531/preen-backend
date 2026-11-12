@@ -141,16 +141,16 @@ class HostAccommodationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/accommodations/" + id))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ACCOMMODATION-001"));
-        patchJson(path, body("listingStatus", "LISTED"), host.token())
+        patchJson(path + "/listing-status", body("listingStatus", "LISTED"), host.token())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("ACCOMMODATION-007"));
 
         postJson(path + "/rooms", roomBody("디럭스", 2, 4, 20000, 120000), host.token()).andExpect(status().isOk());
-        patchJson(path, body("listingStatus", "LISTED"), host.token())
+        patchJson(path + "/listing-status", body("listingStatus", "LISTED"), host.token())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("ACCOMMODATION-007"));
         putJson(path + "/refund-policy", refundPolicyBody(), host.token()).andExpect(status().isOk());
-        patchJson(path, body("listingStatus", "LISTED"), host.token())
+        patchJson(path + "/listing-status", body("listingStatus", "LISTED"), host.token())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.listingStatus").value("LISTED"));
 
@@ -171,7 +171,7 @@ class HostAccommodationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.refundPolicy.rules[2].daysBefore").value(0));
 
         // 숨기면 다시 공개 조회에서 빠진다
-        patchJson(path, body("listingStatus", "HIDDEN"), host.token()).andExpect(status().isOk());
+        patchJson(path + "/listing-status", body("listingStatus", "HIDDEN"), host.token()).andExpect(status().isOk());
         mockMvc.perform(get("/api/accommodations/" + id)).andExpect(status().isNotFound());
     }
 
@@ -223,6 +223,150 @@ class HostAccommodationTest extends IntegrationTestSupport {
                 listing.accommodationId())).isEqualTo(1);
         assertThat(jdbc.queryForObject("select count(*) from refund_policies where accommodation_id = ?",
                 Integer.class, listing.accommodationId())).isEqualTo(1);
+    }
+
+    // ---------- 호스트 조회 ----------
+
+    @Test
+    void 내_숙소_목록에는_공개_상태와_관계없이_내_숙소만_최근_등록순으로_나온다() throws Exception {
+        Member host = createHost();
+        Member other = createHost();
+        Listing listed = createListedAccommodation(host, SEOUL);
+        Listing hidden = createListedAccommodation(host, SEOUL);
+        patchJson("/api/host/accommodations/" + hidden.accommodationId() + "/listing-status",
+                body("listingStatus", "HIDDEN"), host.token()).andExpect(status().isOk());
+        long draftId = data(postJson("/api/host/accommodations", accommodationBody(GANGNAM, "작성 중"), host.token())
+                .andExpect(status().isOk())).get("id").asLong();
+        Listing othersListing = createListedAccommodation(other, SEOUL);
+
+        JsonNode mine = data(getWith("/api/host/accommodations", host.token()).andExpect(status().isOk()));
+        assertThat(ids(mine)).containsExactly(draftId, hidden.accommodationId(), listed.accommodationId())
+                .doesNotContain(othersListing.accommodationId());
+
+        JsonNode draft = find(mine, draftId);
+        assertThat(draft.get("listingStatus").asText()).isEqualTo("DRAFT");
+        assertThat(draft.get("regionName").asText()).isEqualTo("강남구");
+        assertThat(draft.get("categoryName").asText()).isEqualTo("호텔·리조트");
+        assertThat(draft.get("thumbnailUrl").asText()).isEqualTo("http://localhost:8080/uploads/a.jpg");
+        assertThat(draft.get("roomCount").asInt()).isZero();
+        assertThat(draft.get("hasRefundPolicy").asBoolean()).isFalse();
+        assertThat(draft.get("readyToList").asBoolean()).isFalse();
+
+        JsonNode hiddenRow = find(mine, hidden.accommodationId());
+        assertThat(hiddenRow.get("listingStatus").asText()).isEqualTo("HIDDEN");
+        assertThat(hiddenRow.get("roomCount").asInt()).isEqualTo(1);
+        assertThat(hiddenRow.get("activeRoomCount").asInt()).isEqualTo(1);
+        assertThat(hiddenRow.get("hasRefundPolicy").asBoolean()).isTrue();
+        assertThat(hiddenRow.get("readyToList").asBoolean()).isTrue();
+
+        // 숙소가 없는 호스트는 빈 목록, GUEST는 접근 불가
+        getWith("/api/host/accommodations", createHost().token())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+        getWith("/api/host/accommodations", createMember().token())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("COMMON-003"));
+    }
+
+    @Test
+    void 내_숙소_상세는_공개_전_숙소와_판매_중지_객실도_보여준다() throws Exception {
+        Member host = createHost();
+        Member other = createHost();
+        long id = data(postJson("/api/host/accommodations", accommodationBody(SEOUL, "작성 중 상세"), host.token())
+                .andExpect(status().isOk())).get("id").asLong();
+        String path = "/api/host/accommodations/" + id;
+        postJson(path + "/rooms", roomBody("디럭스", 2, 4, 20000, 120000), host.token()).andExpect(status().isOk());
+        long stoppedRoomId = data(postJson(path + "/rooms", roomBody("스위트", 2, 6, 30000, 250000), host.token())
+                .andExpect(status().isOk())).get("id").asLong();
+        patchJson(path + "/rooms/" + stoppedRoomId, body("status", "INACTIVE"), host.token())
+                .andExpect(status().isOk());
+
+        // 공개 조회에는 없는 숙소다
+        mockMvc.perform(get("/api/accommodations/" + id)).andExpect(status().isNotFound());
+
+        getWith(path, host.token())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("작성 중 상세"))
+                .andExpect(jsonPath("$.data.listingStatus").value("DRAFT"))
+                .andExpect(jsonPath("$.data.rooms.length()").value(2))
+                .andExpect(jsonPath("$.data.rooms[1].id").value(stoppedRoomId))
+                .andExpect(jsonPath("$.data.rooms[1].status").value("INACTIVE"))
+                .andExpect(jsonPath("$.data.refundPolicy").doesNotExist());
+
+        getWith(path, other.token())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCOMMODATION-002"));
+        getWith("/api/host/accommodations/999999999", host.token())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ACCOMMODATION-001"));
+    }
+
+    // ---------- 공개 상태 ----------
+
+    @Test
+    void 공개_상태는_전용_API로만_바뀌고_일반_수정에_섞어_보내도_무시된다() throws Exception {
+        Member host = createHost();
+        Member other = createHost();
+        Listing listing = createListedAccommodation(host, SEOUL);
+        String path = "/api/host/accommodations/" + listing.accommodationId();
+
+        patchJson(path, body("name", "이름만 바뀐다", "listingStatus", "HIDDEN"), host.token())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("이름만 바뀐다"))
+                .andExpect(jsonPath("$.data.listingStatus").value("LISTED"));
+        mockMvc.perform(get("/api/accommodations/" + listing.accommodationId())).andExpect(status().isOk());
+
+        patchJson(path + "/listing-status", body(), host.token())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON-001"));
+        patchJson(path + "/listing-status", body("listingStatus", "PUBLIC"), host.token())
+                .andExpect(status().isBadRequest());
+        patchJson(path + "/listing-status", body("listingStatus", "HIDDEN"), other.token())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCOMMODATION-002"));
+        assertThat(jdbc.queryForObject("select listing_status from accommodations where id = ?", String.class,
+                listing.accommodationId())).isEqualTo("LISTED");
+
+        // DRAFT로 되돌릴 수도 있다
+        patchJson(path + "/listing-status", body("listingStatus", "DRAFT"), host.token())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.listingStatus").value("DRAFT"));
+    }
+
+    @Test
+    void 공개_중인_숙소의_마지막_판매_객실은_중지할_수_없다() throws Exception {
+        Member host = createHost();
+        Listing listing = createListedAccommodation(host, SEOUL);
+        String path = "/api/host/accommodations/" + listing.accommodationId();
+        String firstRoom = path + "/rooms/" + listing.roomId();
+
+        patchJson(firstRoom, body("status", "INACTIVE"), host.token())
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACCOMMODATION-010"));
+        assertThat(jdbc.queryForObject("select status from rooms where id = ?", String.class, listing.roomId()))
+                .isEqualTo("ACTIVE");
+        // 상태를 바꾸지 않는 수정은 마지막 객실이어도 된다
+        patchJson(firstRoom, body("nightlyPrice", 110000, "status", "ACTIVE"), host.token())
+                .andExpect(status().isOk());
+
+        // 판매 객실이 2개면 하나는 끌 수 있고, 남은 하나는 다시 막힌다
+        long secondRoomId = data(postJson(path + "/rooms", roomBody("스위트", 2, 6, 30000, 250000), host.token())
+                .andExpect(status().isOk())).get("id").asLong();
+        patchJson(firstRoom, body("status", "INACTIVE"), host.token()).andExpect(status().isOk());
+        // 이미 꺼진 객실을 다시 INACTIVE로 보내는 것은 막지 않는다
+        patchJson(firstRoom, body("status", "INACTIVE"), host.token()).andExpect(status().isOk());
+        patchJson(path + "/rooms/" + secondRoomId, body("status", "INACTIVE"), host.token())
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACCOMMODATION-010"));
+
+        // 숙소를 숨기면 끌 수 있고, 판매 객실이 없으니 다시 공개할 수 없다
+        patchJson(path + "/listing-status", body("listingStatus", "HIDDEN"), host.token())
+                .andExpect(status().isOk());
+        patchJson(path + "/rooms/" + secondRoomId, body("status", "INACTIVE"), host.token())
+                .andExpect(status().isOk());
+        patchJson(path + "/listing-status", body("listingStatus", "LISTED"), host.token())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ACCOMMODATION-007"));
     }
 
     // ---------- 객실 ----------

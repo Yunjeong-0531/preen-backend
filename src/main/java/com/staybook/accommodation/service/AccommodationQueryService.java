@@ -13,6 +13,7 @@ import com.staybook.accommodation.dto.AccommodationDtos.AccommodationDetail;
 import com.staybook.accommodation.dto.AccommodationDtos.AccommodationSummary;
 import com.staybook.accommodation.dto.AccommodationDtos.AmenityResponse;
 import com.staybook.accommodation.dto.AccommodationDtos.CategoryResponse;
+import com.staybook.accommodation.dto.AccommodationDtos.HostAccommodationSummary;
 import com.staybook.accommodation.dto.AccommodationDtos.RefundPolicyResponse;
 import com.staybook.accommodation.dto.AccommodationDtos.RefundRule;
 import com.staybook.accommodation.dto.AccommodationDtos.RegionResponse;
@@ -150,6 +151,31 @@ public class AccommodationQueryService {
                 .filter(Accommodation::isListed)
                 .orElseThrow(() -> new BaseException(AccommodationErrorCode.ACCOMMODATION_NOT_FOUND));
         return toDetail(accommodation, true);
+    }
+
+    /** 호스트의 내 숙소 목록. 공개 상태와 관계없이 모두, 최근 등록순. */
+    public List<HostAccommodationSummary> getHostSummaries(Long hostBusinessId) {
+        List<Accommodation> accommodations = accommodationRepository.findByHostBusinessIdOrderByIdDesc(hostBusinessId);
+        if (accommodations.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = accommodations.stream().map(Accommodation::getId).toList();
+        Map<Long, AccommodationSummary> summaries = toSummaries(accommodations);
+        Map<Long, List<Room>> rooms = roomRepository.findByAccommodationIdIn(ids).stream()
+                .collect(Collectors.groupingBy(Room::getAccommodationId));
+        java.util.Set<Long> withPolicy = refundPolicyRepository.findByAccommodationIdInAndActiveTrue(ids).stream()
+                .map(RefundPolicy::getAccommodationId)
+                .collect(Collectors.toSet());
+
+        return accommodations.stream().map(a -> {
+            AccommodationSummary s = summaries.get(a.getId());
+            List<Room> own = rooms.getOrDefault(a.getId(), List.of());
+            int activeRooms = (int) own.stream().filter(Room::isActive).count();
+            boolean hasPolicy = withPolicy.contains(a.getId());
+            return new HostAccommodationSummary(a.getId(), a.getName(), a.getAddress(), a.getRegionId(),
+                    s.regionName(), a.getCategoryId(), s.categoryName(), s.thumbnailUrl(), a.getListingStatus(),
+                    own.size(), activeRooms, hasPolicy, activeRooms > 0 && hasPolicy);
+        }).toList();
     }
 
     /** 상세 조립. 호스트 응답에서는 판매 중지 객실도 포함한다. */

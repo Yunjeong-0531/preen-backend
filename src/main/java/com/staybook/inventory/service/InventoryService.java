@@ -35,7 +35,7 @@ public class InventoryService {
 
     /** 한 번에 조회·예약할 수 있는 최대 박수. */
     public static final int MAX_NIGHTS = 30;
-    /** 호스트가 한 번에 설정할 수 있는 최대 일수. */
+    /** 호스트가 한 번에 설정·조회할 수 있는 최대 일수. */
     private static final int MAX_SET_DAYS = 366;
 
     private final RoomInventoryRepository inventoryRepository;
@@ -128,6 +128,24 @@ public class InventoryService {
     }
 
     // ---------- 호스트 ----------
+
+    /**
+     * 기간별 재고 조회 (startDate부터 endDate까지, 양 끝 포함). 본인 소유의 객실인지 먼저 검사한다.
+     * 지난 날짜도 조회할 수 있다. 재고 행이 없는 날짜는 결과에 나오지 않는다(판매하지 않는 날).
+     */
+    @Transactional(readOnly = true)
+    public List<InventoryResponse> getInventories(Long userId, Long roomId, LocalDate start, LocalDate end) {
+        accommodationQueryService.assertRoomOwner(roomId, userId);
+        if (end.isBefore(start)) {
+            throw new BaseException(InventoryErrorCode.INVALID_DATE_RANGE);
+        }
+        if (ChronoUnit.DAYS.between(start, end) >= MAX_SET_DAYS) {
+            throw new BaseException(InventoryErrorCode.DATE_RANGE_TOO_LONG);
+        }
+        return inventoryRepository.findByRoomIdAndStayDateBetweenOrderByStayDateAsc(roomId, start, end).stream()
+                .map(InventoryResponse::from)
+                .toList();
+    }
 
     /** 기간별 수량, 가격, 판매 마감 설정. 본인 소유의 객실인지 먼저 검사한다. */
     @Transactional

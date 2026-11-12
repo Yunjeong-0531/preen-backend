@@ -187,7 +187,7 @@ class ReservationPaymentTest extends IntegrationTestSupport {
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVENTORY-001"));
 
         // 공개하지 않은 숙소의 객실
-        patchJson("/api/host/accommodations/" + listing.accommodationId(), body("listingStatus", "HIDDEN"),
+        patchJson("/api/host/accommodations/" + listing.accommodationId() + "/listing-status", body("listingStatus", "HIDDEN"),
                 host.token()).andExpect(status().isOk());
         reserve(guest, listing.roomId(), checkIn, checkIn.plusDays(1), 2)
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("RESERVATION-005"));

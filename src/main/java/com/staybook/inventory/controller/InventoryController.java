@@ -34,6 +34,19 @@ public class InventoryController {
         return ApiResponse.ok(inventoryService.getAvailability(id, checkIn, checkOut));
     }
 
+    /**
+     * 기간별 재고 조회 (양 끝 포함, 최대 366일). 날짜별 수량, 예약·선점 수, 가격, 판매 마감 여부.
+     * HOST 전용이며 본인 객실인지 서비스에서 검사한다. 날짜는 yyyy-MM-dd.
+     */
+    @GetMapping("/api/host/rooms/{roomId}/inventories")
+    public ApiResponse<List<InventoryResponse>> getInventories(
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Long roomId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ApiResponse.ok(inventoryService.getInventories(authUser.userId(), roomId, startDate, endDate));
+    }
+
     /** 기간별 수량, 가격, 판매 마감 설정. HOST 전용이며 본인 객실인지 서비스에서 검사한다. */
     @PutMapping("/api/host/rooms/{roomId}/inventories")
     public ApiResponse<List<InventoryResponse>> setInventories(@AuthenticationPrincipal AuthUser authUser,
