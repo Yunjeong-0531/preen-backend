@@ -38,6 +38,10 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'   // 패키지 의존 방향 검사
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    //swagger
+    // build.gradle dependencies에 추가
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
 }
 
 tasks.named('test') {

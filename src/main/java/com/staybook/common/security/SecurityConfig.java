@@ -23,7 +23,12 @@ public class SecurityConfig {
             "/api/accommodations/**",
             "/api/regions",
             "/api/amenities",
-            "/uploads/**"
+            "/uploads/**",
+            //11/12 스웨거 의존성 추가
+            "/swagger-ui/**",       // Swagger UI 관련 정적 리소스(HTML, JS, CSS) 전체
+            "/swagger-ui.html",     // 구버전/리다이렉트 주소 호환
+            "/v3/api-docs/**",       // OpenAPI 스펙 JSON 데이터 경로 (가장 중요!)
+
     };
 
     @Bean
