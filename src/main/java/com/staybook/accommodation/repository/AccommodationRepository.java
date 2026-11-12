@@ -14,13 +14,15 @@ public interface AccommodationRepository extends JpaRepository<Accommodation, Lo
     java.util.List<Accommodation> findByHostBusinessId(Long hostBusinessId);
 
     /**
-     * 목록 검색. 지역 조건을 쓰지 않을 때는 filterRegion=false, 인원 조건을 쓰지 않을 때는 guestCount=null로 넘긴다.
+     * 목록 검색. 지역 조건을 쓰지 않을 때는 filterRegion=false,
+     * 카테고리·인원 조건을 쓰지 않을 때는 categoryId=null, guestCount=null로 넘긴다.
      * 인원 조건은 roomStatus인 객실 중 최대 인원이 guestCount 이상인 객실이 있는지로 본다.
      */
     @Query("""
             select a from Accommodation a
             where a.listingStatus = :listingStatus
               and (:filterRegion = false or a.regionId in :regionIds)
+              and (:categoryId is null or a.categoryId = :categoryId)
               and (:guestCount is null or exists (
                     select 1 from Room r
                     where r.accommodationId = a.id
@@ -31,6 +33,7 @@ public interface AccommodationRepository extends JpaRepository<Accommodation, Lo
                                @Param("roomStatus") Room.RoomStatus roomStatus,
                                @Param("filterRegion") boolean filterRegion,
                                @Param("regionIds") Collection<Long> regionIds,
+                               @Param("categoryId") Long categoryId,
                                @Param("guestCount") Integer guestCount,
                                Pageable pageable);
 }

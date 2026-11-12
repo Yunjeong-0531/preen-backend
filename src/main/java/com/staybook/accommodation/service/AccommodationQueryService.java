@@ -2,6 +2,7 @@ package com.staybook.accommodation.service;
 
 import com.staybook.accommodation.domain.Accommodation;
 import com.staybook.accommodation.domain.AccommodationAmenity;
+import com.staybook.accommodation.domain.AccommodationCategory;
 import com.staybook.accommodation.domain.AccommodationImage;
 import com.staybook.accommodation.domain.Amenity;
 import com.staybook.accommodation.domain.RefundPolicy;
@@ -11,6 +12,7 @@ import com.staybook.accommodation.domain.RoomImage;
 import com.staybook.accommodation.dto.AccommodationDtos.AccommodationDetail;
 import com.staybook.accommodation.dto.AccommodationDtos.AccommodationSummary;
 import com.staybook.accommodation.dto.AccommodationDtos.AmenityResponse;
+import com.staybook.accommodation.dto.AccommodationDtos.CategoryResponse;
 import com.staybook.accommodation.dto.AccommodationDtos.RefundPolicyResponse;
 import com.staybook.accommodation.dto.AccommodationDtos.RefundRule;
 import com.staybook.accommodation.dto.AccommodationDtos.RegionResponse;
@@ -18,6 +20,7 @@ import com.staybook.accommodation.dto.AccommodationDtos.RoomInfo;
 import com.staybook.accommodation.dto.AccommodationDtos.RoomResponse;
 import com.staybook.accommodation.exception.AccommodationErrorCode;
 import com.staybook.accommodation.repository.AccommodationAmenityRepository;
+import com.staybook.accommodation.repository.AccommodationCategoryRepository;
 import com.staybook.accommodation.repository.AccommodationImageRepository;
 import com.staybook.accommodation.repository.AccommodationRepository;
 import com.staybook.accommodation.repository.AmenityRepository;
@@ -58,6 +61,7 @@ public class AccommodationQueryService {
     private final AccommodationAmenityRepository accommodationAmenityRepository;
     private final AmenityRepository amenityRepository;
     private final RegionRepository regionRepository;
+    private final AccommodationCategoryRepository categoryRepository;
     private final RoomRepository roomRepository;
     private final RoomImageRepository roomImageRepository;
     private final RefundPolicyRepository refundPolicyRepository;
@@ -78,11 +82,17 @@ public class AccommodationQueryService {
                 .toList();
     }
 
+    public List<CategoryResponse> getCategories() {
+        return categoryRepository.findAllByOrderBySortOrderAscIdAsc().stream()
+                .map(c -> new CategoryResponse(c.getId(), c.getName()))
+                .toList();
+    }
+
     /**
      * 목록 검색. LISTED인 숙소만, 최근 등록순.
-     * 시·도를 고르면 그 아래 시·군·구의 숙소도 함께 나온다.
+     * 시·도를 고르면 그 아래 시·군·구의 숙소도 함께 나온다. 카테고리는 정확히 그 유형인 숙소만 나온다.
      */
-    public PageResponse<AccommodationSummary> search(Long regionId, Integer guestCount, int page, int size) {
+    public PageResponse<AccommodationSummary> search(Long regionId, Long categoryId, Integer guestCount, int page, int size) {
         List<Long> regionIds = new ArrayList<>();
         if (regionId != null) {
             regionIds.add(regionId);
@@ -92,7 +102,8 @@ public class AccommodationQueryService {
                 Sort.by(Sort.Direction.DESC, "id"));
         // 공개 조회에는 LISTED인 숙소만 나온다
         Page<Accommodation> result = accommodationRepository.search(
-                Accommodation.ListingStatus.LISTED, Room.RoomStatus.ACTIVE, regionId != null, regionId != null ? regionIds : List.of(-1L), guestCount, pageable);
+                Accommodation.ListingStatus.LISTED, Room.RoomStatus.ACTIVE, regionId != null,
+                regionId != null ? regionIds : List.of(-1L), categoryId, guestCount, pageable);
 
         Map<Long, AccommodationSummary> summaries = toSummaries(result.getContent());
         return PageResponse.from(result, a -> summaries.get(a.getId()));
@@ -112,6 +123,7 @@ public class AccommodationQueryService {
         Map<Long, String> thumbnails = new HashMap<>();
         Map<Long, BigDecimal> minPrices = new HashMap<>();
         Map<Long, String> regionNames = new HashMap<>();
+        Map<Long, String> categoryNames = new HashMap<>();
         if (!ids.isEmpty()) {
             // 정렬 순서대로 오므로 숙소별 첫 이미지가 대표 이미지다
             imageRepository.findByAccommodationIdInOrderBySortOrderAsc(ids)
@@ -121,10 +133,13 @@ public class AccommodationQueryService {
                     .forEach(r -> minPrices.merge(r.getAccommodationId(), r.getNightlyPrice(), BigDecimal::min));
             regionRepository.findAllById(accommodations.stream().map(Accommodation::getRegionId).toList())
                     .forEach(r -> regionNames.put(r.getId(), r.getName()));
+            categoryRepository.findAllById(accommodations.stream().map(Accommodation::getCategoryId).toList())
+                    .forEach(c -> categoryNames.put(c.getId(), c.getName()));
         }
         Map<Long, AccommodationSummary> summaries = new HashMap<>();
         accommodations.forEach(a -> summaries.put(a.getId(), new AccommodationSummary(a.getId(), a.getName(),
-                a.getAddress(), a.getRegionId(), regionNames.get(a.getRegionId()), thumbnails.get(a.getId()),
+                a.getAddress(), a.getRegionId(), regionNames.get(a.getRegionId()),
+                a.getCategoryId(), categoryNames.get(a.getCategoryId()), thumbnails.get(a.getId()),
                 minPrices.get(a.getId()))));
         return summaries;
     }
@@ -163,6 +178,9 @@ public class AccommodationQueryService {
                 id, accommodation.getName(), accommodation.getDescription(), accommodation.getAddress(),
                 accommodation.getRegionId(),
                 regionRepository.findById(accommodation.getRegionId()).map(Region::getName).orElse(null),
+                accommodation.getCategoryId(),
+                categoryRepository.findById(accommodation.getCategoryId()).map(AccommodationCategory::getName)
+                        .orElse(null),
                 accommodation.getLatitude(), accommodation.getLongitude(),
                 accommodation.getCheckInTime(), accommodation.getCheckOutTime(),
                 accommodation.getListingStatus(), imageUrls, amenities,

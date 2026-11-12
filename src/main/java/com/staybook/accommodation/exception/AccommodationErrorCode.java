@@ -17,7 +17,8 @@ public enum AccommodationErrorCode implements ErrorCode {
     INVALID_CAPACITY(HttpStatus.BAD_REQUEST, "ACCOMMODATION-006", "최대 인원은 기준 인원 이상이어야 합니다."),
     NOT_READY_TO_LIST(HttpStatus.BAD_REQUEST, "ACCOMMODATION-007",
             "판매 중인 객실과 환불정책을 등록해야 숙소를 공개할 수 있습니다."),
-    DUPLICATE_REFUND_RULE(HttpStatus.BAD_REQUEST, "ACCOMMODATION-008", "같은 일수의 환불 규칙이 중복되었습니다.");
+    DUPLICATE_REFUND_RULE(HttpStatus.BAD_REQUEST, "ACCOMMODATION-008", "같은 일수의 환불 규칙이 중복되었습니다."),
+    CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, "ACCOMMODATION-009", "존재하지 않는 카테고리입니다.");
 
     private final HttpStatus status;
     private final String code;

@@ -19,6 +19,7 @@ import com.staybook.accommodation.dto.AccommodationDtos.RoomResponse;
 import com.staybook.accommodation.dto.AccommodationDtos.RoomUpdateRequest;
 import com.staybook.accommodation.exception.AccommodationErrorCode;
 import com.staybook.accommodation.repository.AccommodationAmenityRepository;
+import com.staybook.accommodation.repository.AccommodationCategoryRepository;
 import com.staybook.accommodation.repository.AccommodationImageRepository;
 import com.staybook.accommodation.repository.AccommodationRepository;
 import com.staybook.accommodation.repository.AmenityRepository;
@@ -49,6 +50,7 @@ public class HostAccommodationService {
     private final AccommodationAmenityRepository accommodationAmenityRepository;
     private final AmenityRepository amenityRepository;
     private final RegionRepository regionRepository;
+    private final AccommodationCategoryRepository categoryRepository;
     private final RoomRepository roomRepository;
     private final RoomImageRepository roomImageRepository;
     private final RefundPolicyRepository refundPolicyRepository;
@@ -63,9 +65,10 @@ public class HostAccommodationService {
     public AccommodationDetail create(Long userId, AccommodationCreateRequest request) {
         Long businessId = hostService.getBusinessOf(userId).businessId();
         validateRegion(request.regionId());
+        validateCategory(request.categoryId());
 
         Accommodation accommodation = accommodationRepository.save(Accommodation.create(
-                businessId, request.regionId(), request.name().trim(), request.description(),
+                businessId, request.regionId(), request.categoryId(), request.name().trim(), request.description(),
                 request.address().trim(), request.latitude(), request.longitude(),
                 request.checkInTime(), request.checkOutTime(), LocalDateTime.now(clock)));
         replaceImages(accommodation.getId(), request.imageUrls());
@@ -78,7 +81,10 @@ public class HostAccommodationService {
         if (request.regionId() != null) {
             validateRegion(request.regionId());
         }
-        accommodation.update(request.regionId(), trim(request.name()), request.description(),
+        if (request.categoryId() != null) {
+            validateCategory(request.categoryId());
+        }
+        accommodation.update(request.regionId(), request.categoryId(), trim(request.name()), request.description(),
                 trim(request.address()), request.latitude(), request.longitude(),
                 request.checkInTime(), request.checkOutTime());
         if (request.imageUrls() != null) {
@@ -174,6 +180,12 @@ public class HostAccommodationService {
     private void validateRegion(Long regionId) {
         if (!regionRepository.existsById(regionId)) {
             throw new BaseException(AccommodationErrorCode.REGION_NOT_FOUND);
+        }
+    }
+
+    private void validateCategory(Long categoryId) {
+        if (!categoryRepository.existsById(categoryId)) {
+            throw new BaseException(AccommodationErrorCode.CATEGORY_NOT_FOUND);
         }
     }
 

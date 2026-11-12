@@ -28,6 +28,7 @@ public final class AccommodationDtos {
 
     public record AccommodationCreateRequest(
             @NotNull(message = "지역을 선택해 주세요.") Long regionId,
+            @NotNull(message = "카테고리를 선택해 주세요.") Long categoryId,
             @NotBlank(message = "숙소 이름을 입력해 주세요.") @Size(max = 100) String name,
             @Size(max = 5000) String description,
             @NotBlank(message = "주소를 입력해 주세요.") @Size(max = 255) String address,
@@ -44,6 +45,7 @@ public final class AccommodationDtos {
     /** 보내지 않은(null) 항목은 바꾸지 않는다. imageUrls, amenityIds는 보내면 통째로 교체한다. */
     public record AccommodationUpdateRequest(
             Long regionId,
+            Long categoryId,
             @Size(max = 100) @Pattern(regexp = BLANK_ONLY, message = "숙소 이름을 입력해 주세요.") String name,
             @Size(max = 5000) String description,
             @Size(max = 255) @Pattern(regexp = BLANK_ONLY, message = "주소를 입력해 주세요.") String address,
@@ -115,13 +117,16 @@ public final class AccommodationDtos {
     public record AmenityResponse(Long id, String name) {
     }
 
+    public record CategoryResponse(Long id, String name) {
+    }
+
     /**
      * 목록의 한 줄.
      *
      * @param minNightlyPrice 판매 중인 객실 기본가 중 최저가. 객실이 없으면 null
      */
     public record AccommodationSummary(Long id, String name, String address, Long regionId, String regionName,
-                                       String thumbnailUrl, BigDecimal minNightlyPrice) {
+                                       Long categoryId, String categoryName, String thumbnailUrl, BigDecimal minNightlyPrice) {
     }
 
     public record RoomResponse(Long id, String name, int capacity, int maxCapacity, BigDecimal extraPersonFee,
@@ -138,6 +143,8 @@ public final class AccommodationDtos {
             String address,
             Long regionId,
             String regionName,
+            Long categoryId,
+            String categoryName,
             BigDecimal latitude,
             BigDecimal longitude,
             LocalTime checkInTime,

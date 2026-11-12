@@ -2,7 +2,7 @@
 
 이 문서는 설계 단계에서 확정한 구조와 규칙입니다. 아래 내용대로 구현해 주세요. 문서와 기존 코드가 다르면 임의로 고치지 말고 먼저 물어봐 주세요.
 
-참조 문서: `docs/StayBook_ERD_1차구현_Mermaid.md` (테이블 30개, 컬럼, NULL 허용, 유니크 제약의 기준)
+참조 문서: `docs/StayBook_ERD_1차구현_Mermaid.md` (테이블 31개, 컬럼, NULL 허용, 유니크 제약의 기준)
 
 ## 1. 작업 방식
 
@@ -22,7 +22,7 @@
 | auth | USER_CREDENTIALS, USER_SOCIAL_ACCOUNTS, LOGIN_ATTEMPTS, VERIFICATION_CODES, PASSWORD_RESET_TOKENS |
 | terms | TERMS, USER_TERM_AGREEMENTS |
 | host | HOST_BUSINESSES |
-| accommodation | REGIONS, ACCOMMODATIONS, ACCOMMODATION_IMAGES, AMENITIES, ACCOMMODATION_AMENITIES, ROOMS, ROOM_IMAGES, REFUND_POLICIES, REFUND_POLICY_RULES |
+| accommodation | REGIONS, ACCOMMODATION_CATEGORIES, ACCOMMODATIONS, ACCOMMODATION_IMAGES, AMENITIES, ACCOMMODATION_AMENITIES, ROOMS, ROOM_IMAGES, REFUND_POLICIES, REFUND_POLICY_RULES |
 | inventory | ROOM_INVENTORIES, INVENTORY_HOLDS |
 | reservation | RESERVATIONS, RESERVATION_PRICE_ITEMS, RESERVATION_STATUS_HISTORY |
 | payment | PAYMENTS, PAYMENT_LOGS, REFUNDS |
@@ -157,8 +157,8 @@ auth, terms → user
 
 | 경로 | 기능 |
 |---|---|
-| `GET /api/regions`, `GET /api/amenities` | 지역, 편의시설 목록 |
-| `GET /api/accommodations` | 목록 검색 (지역, 인원, 페이지) |
+| `GET /api/regions`, `GET /api/amenities`, `GET /api/categories` | 지역, 편의시설, 카테고리 목록 |
+| `GET /api/accommodations` | 목록 검색 (지역 `regionId`, 카테고리 `categoryId`, 인원 `guestCount`, 페이지) |
 | `GET /api/accommodations/{id}` | 상세 (이미지, 편의시설, 객실, 환불정책) |
 | `POST/PATCH /api/host/accommodations` | 숙소 등록·수정 |
 | `POST/PATCH /api/host/accommodations/{id}/rooms` | 객실 등록·수정 |
@@ -166,7 +166,8 @@ auth, terms → user
 
 - 공개 조회에는 `listing_status = LISTED`인 숙소만 나온다.
 - 환불정책은 수정하지 않고 새 버전을 만들어 `active`를 옮긴다. 기존 예약이 과거 버전을 참조하기 때문이다.
-- 지역과 편의시설 초기 데이터는 마이그레이션으로 넣는다.
+- 지역, 편의시설, 카테고리 초기 데이터는 마이그레이션으로 넣는다.
+- 숙소는 카테고리 하나에 속한다. 등록할 때 `categoryId`는 필수이고, 검색 조건은 함께 쓰면 모두 만족하는 숙소만 나온다.
 
 ### 5.6 inventory
 
@@ -283,6 +284,7 @@ auth, terms → user
 | 5 | reservation, payment | V4 |
 | 6 | review, favorite | V5 |
 | 7 | 전체 시나리오 통합 테스트 | 없음 |
+| 변경 | 숙소 카테고리 추가 (테이블, 목록 API, 검색 조건) | V6 |
 
 각 단계에서 마이그레이션 → 엔티티·리포지터리 → 서비스 → 컨트롤러 → 테스트 순으로 작업한다.
 
@@ -297,7 +299,7 @@ auth, terms → user
 
 ## 10. 완료 기준
 
-- 빈 DB에서 V1부터 V5까지 Flyway 마이그레이션이 오류 없이 적용된다.
+- 빈 DB에서 V1부터 V6까지 Flyway 마이그레이션이 오류 없이 적용된다.
 - 빌드와 전체 테스트가 통과한다.
 - 4장의 의존 방향을 어기는 import가 없다.
 - 통합 테스트로 다음 시나리오가 확인된다.

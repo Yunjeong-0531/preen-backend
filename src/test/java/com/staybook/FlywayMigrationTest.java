@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 /**
- * 완료 기준: 빈 DB에서 V1부터 V5까지 Flyway 마이그레이션이 오류 없이 적용된다.
+ * 완료 기준: 빈 DB에서 V1부터 마지막 버전(V6)까지 Flyway 마이그레이션이 오류 없이 적용된다.
  * <p>
  * 개발 DB를 비울 수는 없으므로 검증 전용 스키마({DB_NAME}_migration_test)를 매번 비우고 처음부터 적용한다.
  * 이 스키마는 한 번 만들어 두어야 한다 (MySQL root로 실행):
@@ -33,7 +33,7 @@ class FlywayMigrationTest {
     private final String password = env("DB_PASSWORD", "");
 
     @Test
-    void 빈_DB에서_V1부터_V5까지_오류_없이_적용된다() throws Exception {
+    void 빈_DB에서_V1부터_V6까지_오류_없이_적용된다() throws Exception {
         assumeSchemaIsReachable();
         Flyway flyway = Flyway.configure()
                 .dataSource(url, username, password)
@@ -47,13 +47,13 @@ class FlywayMigrationTest {
         MigrateResult result = flyway.migrate();
 
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(5);
-        assertThat(result.targetSchemaVersion).isEqualTo("5");
-        assertThat(count("select count(*) from flyway_schema_history where success = 1")).isEqualTo(5);
+        assertThat(result.migrationsExecuted).isEqualTo(6);
+        assertThat(result.targetSchemaVersion).isEqualTo("6");
+        assertThat(count("select count(*) from flyway_schema_history where success = 1")).isEqualTo(6);
 
-        // ERD의 30개 테이블
+        // ERD의 30개 테이블 + V6에서 추가한 accommodation_categories
         assertThat(count("select count(*) from information_schema.tables where table_schema = database() "
-                + "and table_name <> 'flyway_schema_history'")).isEqualTo(30);
+                + "and table_name <> 'flyway_schema_history'")).isEqualTo(31);
         // V3에서 미뤘던 FK가 V4에서 추가됐는지
         assertThat(count("select count(*) from information_schema.referential_constraints "
                 + "where constraint_schema = database() and constraint_name = 'fk_inventory_holds_reservation'"))
@@ -64,6 +64,7 @@ class FlywayMigrationTest {
         assertThat(count("select count(*) from regions where level = 1")).isEqualTo(17);
         assertThat(count("select count(*) from regions where level = 2 and parent_id is not null")).isEqualTo(17);
         assertThat(count("select count(*) from amenities")).isEqualTo(10);
+        assertThat(count("select count(*) from accommodation_categories")).isEqualTo(8);
         // 리프레시 토큰, Spotify 트랙 테이블은 만들지 않는다
         assertThat(count("select count(*) from information_schema.tables where table_schema = database() "
                 + "and (table_name like '%refresh%' or table_name like '%spotify%' or table_name like '%token%' "

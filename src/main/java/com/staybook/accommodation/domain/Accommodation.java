@@ -40,6 +40,9 @@ public class Accommodation {
     @Column(nullable = false)
     private Long regionId;
 
+    @Column(nullable = false)
+    private Long categoryId;
+
     @Column(nullable = false, length = 100)
     private String name;
 
@@ -69,12 +72,13 @@ public class Accommodation {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    public static Accommodation create(Long hostBusinessId, Long regionId, String name, String description,
+    public static Accommodation create(Long hostBusinessId, Long regionId, Long categoryId, String name, String description,
                                        String address, BigDecimal latitude, BigDecimal longitude,
                                        LocalTime checkInTime, LocalTime checkOutTime, LocalDateTime now) {
         Accommodation a = new Accommodation();
         a.hostBusinessId = hostBusinessId;
         a.regionId = regionId;
+        a.categoryId = categoryId;
         a.name = name;
         a.description = description;
         a.address = address;
@@ -88,10 +92,13 @@ public class Accommodation {
     }
 
     /** null인 항목은 바꾸지 않는다. */
-    public void update(Long regionId, String name, String description, String address, BigDecimal latitude,
+    public void update(Long regionId, Long categoryId, String name, String description, String address, BigDecimal latitude,
                        BigDecimal longitude, LocalTime checkInTime, LocalTime checkOutTime) {
         if (regionId != null) {
             this.regionId = regionId;
+        }
+        if (categoryId != null) {
+            this.categoryId = categoryId;
         }
         if (name != null) {
             this.name = name;

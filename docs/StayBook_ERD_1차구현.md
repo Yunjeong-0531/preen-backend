@@ -1,6 +1,6 @@
 # StayBook 데이터베이스 설계 (ERD)
 
-StayBook은 숙박 예약 서비스입니다. 이 문서는 1차 구현(MVP)의 데이터베이스 구조를 처음 보는 사람도 이해할 수 있도록 정리한 것입니다. 총 **30개 테이블**로 아래 한 사이클을 처리합니다.
+StayBook은 숙박 예약 서비스입니다. 이 문서는 1차 구현(MVP)의 데이터베이스 구조를 처음 보는 사람도 이해할 수 있도록 정리한 것입니다. 총 **31개 테이블**로 아래 한 사이클을 처리합니다.
 
 > **회원가입 → 숙소 조회 → 예약 → 결제 → 취소/환불 → 리뷰**
 
@@ -24,7 +24,7 @@ StayBook은 숙박 예약 서비스입니다. 이 문서는 1차 구현(MVP)의 
 | 도메인 | 테이블 수 | 한 줄 설명 |
 |---|---|---|
 | A. 회원·인증·약관 | 9 | 누가 가입했고, 어떻게 로그인하고, 어떤 약관에 동의했는가 |
-| B. 호스트·숙소·객실·재고 | 12 | 누가 어떤 숙소와 객실을 어떤 가격, 어떤 재고로 파는가 |
+| B. 호스트·숙소·객실·재고 | 13 | 누가 어떤 숙소와 객실을 어떤 가격, 어떤 재고로 파는가 |
 | C. 예약·결제·환불 | 6 | 누가 무엇을 예약했고, 얼마를 결제했고, 얼마를 돌려받았는가 |
 | D. 리뷰·찜 | 3 | 투숙 후기와 관심 숙소 |
 
@@ -196,7 +196,7 @@ DB 테이블 대신 Redis에 저장하는 값입니다.
 
 ---
 
-## 4. B. 호스트·숙소·객실·재고 (12개)
+## 4. B. 호스트·숙소·객실·재고 (13개)
 
 ### 개념 설명
 
@@ -205,6 +205,7 @@ DB 테이블 대신 Redis에 저장하는 값입니다.
 - 결제 전 동시 예약을 막기 위해 재고를 잠시 잡아두는 장치가 `INVENTORY_HOLDS`입니다. 2박 예약이면 hold 행이 2개 생깁니다.
 - 환불 규정은 숙소별로 버전 관리합니다(`REFUND_POLICIES`). 세부 구간은 `REFUND_POLICY_RULES`(예: 체크인 3일 전까지 100% 환불)에 둡니다.
 - 지역(`REGIONS`)은 자기 자신을 부모로 참조하는 트리 구조입니다(예: 서울 > 강남구).
+- 숙소는 카테고리(`ACCOMMODATION_CATEGORIES`) 하나에 속합니다. 호텔·리조트, 한옥, 독채·풀빌라 같은 숙박 유형이며, 목록 검색의 필터로 씁니다.
 
 ### ERD
 
@@ -214,6 +215,7 @@ erDiagram
     HOST_BUSINESSES ||--o{ ACCOMMODATIONS : operates
     REGIONS |o--o{ REGIONS : parent
     REGIONS ||--o{ ACCOMMODATIONS : located_in
+    ACCOMMODATION_CATEGORIES ||--o{ ACCOMMODATIONS : categorizes
     ACCOMMODATIONS ||--o{ ACCOMMODATION_IMAGES : shows
     ACCOMMODATIONS ||--o{ ACCOMMODATION_AMENITIES : provides
     AMENITIES ||--o{ ACCOMMODATION_AMENITIES : describes
@@ -238,10 +240,16 @@ erDiagram
         varchar name
         tinyint level
     }
+    ACCOMMODATION_CATEGORIES {
+        bigint id PK
+        varchar name UK
+        int sort_order
+    }
     ACCOMMODATIONS {
         bigint id PK
         bigint host_business_id FK
         bigint region_id FK
+        bigint category_id FK
         varchar name
         text description
         varchar address
@@ -320,7 +328,8 @@ erDiagram
 |---|---|---|
 | `HOST_BUSINESSES` | 호스트의 사업자 정보 | 1차는 사업자등록번호 형식 검증을 통과하면 바로 `APPROVED`로 저장하고 `USERS.role`을 HOST로 변경. `approval_status`는 이후 심사 기능을 위해 유지 |
 | `REGIONS` | 지역 (시·도 > 시·군·구) | `parent_id`로 자기 참조. `level`은 계층 깊이 |
-| `ACCOMMODATIONS` | 숙소 | `listing_status`: DRAFT(작성 중) / LISTED(노출) / HIDDEN(숨김). 체크인·체크아웃 시각 포함 |
+| `ACCOMMODATION_CATEGORIES` | 숙소 카테고리 마스터 (호텔·리조트, 펜션, 한옥, 독채·풀빌라, 게스트하우스, 모텔, 캠핑·글램핑, 기타) | 이름 유니크. `sort_order`로 노출 순서. 초기 데이터는 마이그레이션(V6)으로 넣음 |
+| `ACCOMMODATIONS` | 숙소 | `listing_status`: DRAFT(작성 중) / LISTED(노출) / HIDDEN(숨김). 체크인·체크아웃 시각 포함. `category_id`는 필수이며 숙소 하나는 카테고리 하나에 속함 |
 | `ACCOMMODATION_IMAGES` | 숙소 사진 | `sort_order`로 노출 순서 |
 | `AMENITIES` | 편의시설 마스터 (와이파이, 주차 등) | 이름 유니크 |
 | `ACCOMMODATION_AMENITIES` | 숙소와 편의시설의 다대다 연결 | 복합 PK `(accommodation_id, amenity_id)` |

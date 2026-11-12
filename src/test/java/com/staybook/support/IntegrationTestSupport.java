@@ -185,8 +185,9 @@ public abstract class IntegrationTestSupport {
         return new Member(member.userId(), member.email(), hostToken);
     }
 
+    /** 호텔·리조트(카테고리 1)로 등록하는 요청 본문. */
     protected Map<String, Object> accommodationBody(long regionId, String name) {
-        return body("regionId", regionId, "name", name, "description", "테스트 숙소 설명",
+        return body("regionId", regionId, "categoryId", 1, "name", name, "description", "테스트 숙소 설명",
                 "address", "테스트시 테스트구 1-1", "latitude", 37.5665, "longitude", 126.978,
                 "checkInTime", "15:00", "checkOutTime", "11:00",
                 "imageUrls", List.of("http://localhost:8080/uploads/a.jpg", "http://localhost:8080/uploads/b.jpg"),

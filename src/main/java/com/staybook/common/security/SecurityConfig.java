@@ -23,6 +23,7 @@ public class SecurityConfig {
             "/api/accommodations/**",
             "/api/regions",
             "/api/amenities",
+            "/api/categories",
             "/uploads/**",
             //11/12 스웨거 의존성 추가
             "/swagger-ui/**",       // Swagger UI 관련 정적 리소스(HTML, JS, CSS) 전체

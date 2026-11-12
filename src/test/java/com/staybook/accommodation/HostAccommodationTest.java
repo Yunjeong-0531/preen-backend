@@ -20,6 +20,8 @@ class HostAccommodationTest extends IntegrationTestSupport {
     private static final long GANGNAM = 101L;
     private static final long JEJU = 17L;
     private static final long SEOGWIPO = 1702L;
+    private static final long HOTEL = 1L;
+    private static final long HANOK = 3L;
 
     // ---------- 사업자 등록 ----------
 
@@ -352,6 +354,74 @@ class HostAccommodationTest extends IntegrationTestSupport {
         assertThat(ids(search("&regionId=" + JEJU + "&guestCount=4"))).contains(seogwipo.accommodationId());
         assertThat(ids(search("&regionId=" + JEJU + "&guestCount=5"))).doesNotContain(seogwipo.accommodationId());
         mockMvc.perform(get("/api/accommodations").param("guestCount", "0")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 카테고리_목록을_조회하고_카테고리로_검색한다() throws Exception {
+        // 목록은 토큰 없이, 정렬 순서대로
+        mockMvc.perform(get("/api/categories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(8))
+                .andExpect(jsonPath("$.data[0].id").value(HOTEL))
+                .andExpect(jsonPath("$.data[0].name").value("호텔·리조트"))
+                .andExpect(jsonPath("$.data[2].name").value("한옥"))
+                .andExpect(jsonPath("$.data[7].name").value("기타"));
+
+        Member host = createHost();
+        Listing hotel = createListedAccommodation(host, SEOGWIPO);      // 기본: 호텔·리조트
+        Listing hanok = createListedAccommodation(host, SEOGWIPO);
+        Listing hanokSeoul = createListedAccommodation(host, GANGNAM);
+        for (Listing listing : List.of(hanok, hanokSeoul)) {
+            patchJson("/api/host/accommodations/" + listing.accommodationId(), body("categoryId", HANOK),
+                    host.token())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.categoryId").value(HANOK))
+                    .andExpect(jsonPath("$.data.categoryName").value("한옥"));
+        }
+
+        JsonNode hanoks = search("&categoryId=" + HANOK);
+        assertThat(ids(hanoks)).contains(hanok.accommodationId(), hanokSeoul.accommodationId())
+                .doesNotContain(hotel.accommodationId());
+        assertThat(find(hanoks, hanok.accommodationId()).get("categoryName").asText()).isEqualTo("한옥");
+        assertThat(ids(search("&categoryId=" + HOTEL))).contains(hotel.accommodationId())
+                .doesNotContain(hanok.accommodationId());
+
+        // 다른 조건과 함께 쓰면 모두 만족하는 숙소만 나온다
+        assertThat(ids(search("&categoryId=" + HANOK + "&regionId=" + JEJU))).contains(hanok.accommodationId())
+                .doesNotContain(hanokSeoul.accommodationId(), hotel.accommodationId());
+        assertThat(ids(search("&categoryId=" + HANOK + "&regionId=" + JEJU + "&guestCount=5")))
+                .doesNotContain(hanok.accommodationId());
+        // 없는 카테고리는 빈 목록
+        assertThat(ids(search("&categoryId=999999"))).isEmpty();
+
+        mockMvc.perform(get("/api/accommodations/" + hanok.accommodationId()))
+                .andExpect(jsonPath("$.data.categoryId").value(HANOK))
+                .andExpect(jsonPath("$.data.categoryName").value("한옥"));
+    }
+
+    @Test
+    void 숙소_등록과_수정에서_카테고리를_검증한다() throws Exception {
+        Member host = createHost();
+        Map<String, Object> missing = accommodationBody(SEOUL, "카테고리 없음");
+        missing.remove("categoryId");
+        postJson("/api/host/accommodations", missing, host.token())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON-001"));
+        Map<String, Object> unknown = accommodationBody(SEOUL, "없는 카테고리");
+        unknown.put("categoryId", 999_999);
+        postJson("/api/host/accommodations", unknown, host.token())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ACCOMMODATION-009"));
+
+        long id = data(postJson("/api/host/accommodations", accommodationBody(SEOUL, "정상"), host.token())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.categoryName").value("호텔·리조트"))).get("id").asLong();
+        patchJson("/api/host/accommodations/" + id, body("categoryId", 999_999), host.token())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ACCOMMODATION-009"));
+        // 카테고리를 보내지 않은 수정은 카테고리를 바꾸지 않는다
+        patchJson("/api/host/accommodations/" + id, body("name", "이름만 변경"), host.token())
+                .andExpect(jsonPath("$.data.categoryId").value(HOTEL));
     }
 
     @Test

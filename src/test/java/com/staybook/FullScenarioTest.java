@@ -92,7 +92,7 @@ class FullScenarioTest extends IntegrationTestSupport {
 
         // 숙소 등록 (DRAFT) → 객실 등록 → 환불정책 설정 → 공개
         accommodationId = data(postJson("/api/host/accommodations",
-                body("regionId", SEOGWIPO, "name", "서귀포 오션뷰 " + UUID.randomUUID(), "description", "바다가 보이는 숙소",
+                body("regionId", SEOGWIPO, "categoryId", 4, "name", "서귀포 오션뷰 " + UUID.randomUUID(), "description", "바다가 보이는 숙소",
                         "address", "제주 서귀포시 테스트로 1", "checkInTime", "15:00", "checkOutTime", "11:00",
                         "imageUrls", List.of(imageUrl), "amenityIds", List.of(1, 2)), hostToken)
                 .andExpect(status().isOk())
@@ -122,7 +122,7 @@ class FullScenarioTest extends IntegrationTestSupport {
     void 시나리오2_다른_회원이_숙소를_조회하고_예약해서_결제하면_예약이_확정된다() throws Exception {
         // 숙소 조회는 로그인 없이 한다: 목록 검색 → 상세 → 예약 가능 여부
         JsonNode list = data(mockMvc.perform(get("/api/accommodations")
-                .param("regionId", String.valueOf(JEJU)).param("guestCount", "3").param("size", "50"))
+                .param("regionId", String.valueOf(JEJU)).param("categoryId", "4").param("guestCount", "3").param("size", "50"))
                 .andExpect(status().isOk())).get("content");
         List<Long> ids = new ArrayList<>();
         list.forEach(row -> ids.add(row.get("id").asLong()));
