@@ -26,7 +26,7 @@
 | inventory | ROOM_INVENTORIES, INVENTORY_HOLDS |
 | reservation | RESERVATIONS, RESERVATION_PRICE_ITEMS, RESERVATION_STATUS_HISTORY |
 | payment | PAYMENTS, PAYMENT_LOGS, REFUNDS |
-| review | REVIEWS, REVIEW_IMAGES |
+| review | REVIEWS |
 | favorite | FAVORITES |
 
 1차 전제: 숙박(1박 이상)만 지원, 예약 1건 = 객실 1개, 할인 없음, 정산 없음.
@@ -238,13 +238,14 @@ auth, terms → user
 
 | 경로 | 기능 |
 |---|---|
-| `GET /api/accommodations/{id}/reviews` | 숙소 리뷰 목록 |
+| `GET /api/accommodations/{id}/reviews?sort&rating` | 숙소 리뷰 목록 (별점 + 음악). `sort`: LATEST(기본)·RATING_DESC·RATING_ASC, `rating`: 1~5면 그 별점만 |
 | `GET /api/accommodations/{id}/tracks` | 숙소별 트랙 목록 (노출 리뷰에 붙은 곡, 중복 제거, 최근순, 최대 50곡) |
-| `POST /api/reviews`, `PATCH/DELETE /api/reviews/{id}` | 작성, 수정, 삭제 |
-| `POST /api/host/reviews/{id}/reply` | 호스트 답글 |
+| `POST /api/reviews`, `PATCH/DELETE /api/reviews/{id}` | 작성, 수정(별점·곡 변경), 삭제 |
 | `GET /api/spotify/tracks/search?q=` | 트랙 검색 (로그인 필요) |
 
+- 리뷰는 **별점(1~5)과 음악(Spotify 트랙)만** 남긴다. 둘 다 필수다. 리뷰 글, 사진, 호스트 답글은 없다.
 - 작성 조건: 본인 예약, 예약 상태 COMPLETED, 예약당 1건.
+- 별점순 정렬에서 같은 별점끼리는 최근 작성순이다.
 - Spotify
   - 리뷰에는 트랙 ID 문자열만 저장한다. 제목, 아티스트, 커버 같은 메타데이터는 DB에 저장하지 않는다.
   - 검색 API는 Spotify 응답을 그대로 가공해 전달만 한다.
@@ -258,7 +259,7 @@ auth, terms → user
 
 ### 5.11 이미지 업로드 (common/storage)
 
-- `POST /api/images`: 파일을 받아 URL을 반환한다. 숙소, 객실, 리뷰가 이 URL을 저장한다.
+- `POST /api/images`: 파일을 받아 URL을 반환한다. 숙소, 객실이 이 URL을 저장한다.
 - 저장소는 `StorageClient` 인터페이스 뒤에 두고, 1차 구현체는 로컬 디스크로 한다.
 - 이미지 형식과 크기 제한을 검사한다.
 

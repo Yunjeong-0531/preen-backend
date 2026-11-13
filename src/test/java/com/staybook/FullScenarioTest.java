@@ -278,8 +278,7 @@ class FullScenarioTest extends IntegrationTestSupport {
         JsonNode reservation = reserveOk(guest, roomId, firstDay, firstDay.plusDays(1), 2);
         long reservationId = reservation.get("id").asLong();
         pay(guest, reservation);
-        var review = body("reservationId", reservationId, "rating", 5, "content", "바다가 정말 잘 보여요.",
-                "spotifyTrackId", "4uLU6hMCjMI75M1A2tKUQC");
+        var review = body("reservationId", reservationId, "rating", 5, "spotifyTrackId", "4uLU6hMCjMI75M1A2tKUQC");
 
         // 아직 투숙 전이라 쓸 수 없다
         postJson("/api/reviews", review, guest.token())
@@ -292,20 +291,16 @@ class FullScenarioTest extends IntegrationTestSupport {
         getWith("/api/reservations/" + reservationId, guest.token())
                 .andExpect(jsonPath("$.data.status").value("COMPLETED"));
 
-        long reviewId = data(postJson("/api/reviews", review, guest.token()).andExpect(status().isOk()))
-                .get("id").asLong();
+        postJson("/api/reviews", review, guest.token()).andExpect(status().isOk());
         postJson("/api/reviews", review, guest.token())
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("REVIEW-004"));
 
-        // 호스트가 답글을 달고, 리뷰는 로그인 없이 보인다. 찜도 한다.
-        postJson("/api/host/reviews/" + reviewId + "/reply", body("reply", "다음에 또 오세요."), hostToken)
-                .andExpect(status().isOk());
-        mockMvc.perform(get("/api/accommodations/" + accommodationId + "/reviews"))
+        // 리뷰(별점 + 음악)는 로그인 없이 보인다. 찜도 한다.
+        mockMvc.perform(get("/api/accommodations/" + accommodationId + "/reviews").param("sort", "RATING_DESC"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.content[0].rating").value(5))
-                .andExpect(jsonPath("$.data.content[0].spotifyTrackId").value("4uLU6hMCjMI75M1A2tKUQC"))
-                .andExpect(jsonPath("$.data.content[0].hostReply").value("다음에 또 오세요."));
+                .andExpect(jsonPath("$.data.content[0].spotifyTrackId").value("4uLU6hMCjMI75M1A2tKUQC"));
         mockMvc.perform(withToken(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                 .post("/api/favorites/" + accommodationId), guest.token())).andExpect(status().isOk());
         getWith("/api/favorites/me", guest.token())
@@ -346,8 +341,7 @@ class FullScenarioTest extends IntegrationTestSupport {
                 body("startDate", checkIn.toString(), "endDate", checkIn.toString(), "totalCount", 9), guestToken)
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("COMMON-003"));
-        postJson("/api/host/reviews/1/reply", body("reply", "게스트의 답글"), guestToken)
-                .andExpect(status().isForbidden());
+        getWith("/api/host/accommodations", guestToken).andExpect(status().isForbidden());
         // ADMIN 경로도 규칙만 등록돼 있어 HOST조차 접근할 수 없다
         getWith("/api/admin/anything", hostToken).andExpect(status().isForbidden());
 

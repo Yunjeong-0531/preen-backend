@@ -15,6 +15,9 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     Page<Review> findByAccommodationIdAndStatus(Long accommodationId, Review.Status status, Pageable pageable);
 
+    Page<Review> findByAccommodationIdAndStatusAndRating(Long accommodationId, Review.Status status, int rating,
+                                                         Pageable pageable);
+
     /** 숙소의 노출 리뷰에 붙은 트랙을 곡별로 묶는다. 가장 최근 리뷰에 붙은 곡이 앞에 온다. */
     @Query("""
             select new com.staybook.review.dto.ReviewDtos$TrackResponse(

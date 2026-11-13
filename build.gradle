@@ -46,15 +46,8 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
-
-    // 테스트 전용 값. 실제 키가 아니며, 환경 변수가 이미 있으면 그 값을 쓴다.
-    def testDefaults = [
-            JWT_SECRET           : 'test-only-jwt-secret-test-only-jwt-secret-0123456789',
-            CRYPTO_ENCRYPTION_KEY: 'dGVzdC1vbmx5LWVuY3J5cHRpb24ta2V5LTMyYnl0ZSE=',
-            CRYPTO_HASH_KEY      : 'test-only-hash-key-test-only-hash-key'
-    ]
     // 루트의 .env(docker-compose와 같은 파일)를 테스트 JVM에 넘긴다.
-    // PC에 같은 이름의 환경 변수가 남아 있어도 테스트는 .env의 DB·Redis로 접속한다.
+    // PC에 같은 이름의 환경 변수가 남아 있어도 테스트는 .env 값이 우선한다.
     def envFile = rootProject.file('.env')
     if (envFile.exists()) {
         envFile.eachLine('UTF-8') { line ->
@@ -64,10 +57,23 @@ tasks.named('test') {
             }
         }
     }
+    // 테스트 전용 값. 실제 키가 아니며, .env에 키가 있어도 테스트는 이 값을 쓴다
+    // (테스트 데이터는 아래의 테스트 전용 DB에만 들어가므로 개발 DB의 암호문과 섞이지 않는다).
+    // OS 환경 변수로 직접 지정한 경우(CI 등)에만 그 값을 쓴다.
+    def testDefaults = [
+            JWT_SECRET           : 'test-only-jwt-secret-test-only-jwt-secret-0123456789',
+            CRYPTO_ENCRYPTION_KEY: 'dGVzdC1vbmx5LWVuY3J5cHRpb24ta2V5LTMyYnl0ZSE=',
+            CRYPTO_HASH_KEY      : 'test-only-hash-key-test-only-hash-key'
+    ]
 
     testDefaults.each { name, value ->
         if (System.getenv(name) == null) {
             environment name, value
         }
     }
+
+    // 테스트는 개발 DB·Redis와 분리한다
+    def devDbName = environment['DB_NAME'] ?: 'staybook'
+    environment 'DB_NAME', devDbName + '_test'
+    environment 'REDIS_DATABASE', '1'
 }

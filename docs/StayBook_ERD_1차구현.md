@@ -1,6 +1,6 @@
 # StayBook 데이터베이스 설계 (ERD)
 
-StayBook은 숙박 예약 서비스입니다. 이 문서는 1차 구현(MVP)의 데이터베이스 구조를 처음 보는 사람도 이해할 수 있도록 정리한 것입니다. 총 **31개 테이블**로 아래 한 사이클을 처리합니다.
+StayBook은 숙박 예약 서비스입니다. 이 문서는 1차 구현(MVP)의 데이터베이스 구조를 처음 보는 사람도 이해할 수 있도록 정리한 것입니다. 총 **30개 테이블**로 아래 한 사이클을 처리합니다.
 
 > **회원가입 → 숙소 조회 → 예약 → 결제 → 취소/환불 → 리뷰**
 
@@ -26,7 +26,7 @@ StayBook은 숙박 예약 서비스입니다. 이 문서는 1차 구현(MVP)의 
 | A. 회원·인증·약관 | 9 | 누가 가입했고, 어떻게 로그인하고, 어떤 약관에 동의했는가 |
 | B. 호스트·숙소·객실·재고 | 13 | 누가 어떤 숙소와 객실을 어떤 가격, 어떤 재고로 파는가 |
 | C. 예약·결제·환불 | 6 | 누가 무엇을 예약했고, 얼마를 결제했고, 얼마를 돌려받았는가 |
-| D. 리뷰·찜 | 3 | 투숙 후기와 관심 숙소 |
+| D. 리뷰·찜 | 2 | 투숙 후기(별점 + 음악)와 관심 숙소 |
 
 **도메인 간 큰 흐름**
 
@@ -467,13 +467,14 @@ erDiagram
 
 ---
 
-## 6. D. 리뷰·찜 (3개)
+## 6. D. 리뷰·찜 (2개)
 
 ### 개념 설명
 
 - 리뷰는 **예약 1건당 1개**만 작성할 수 있습니다(`reservation_id` 유니크). 실제로 투숙한 사람만 쓸 수 있게 하기 위한 구조입니다.
-- 리뷰에 음악을 붙일 수 있습니다. Spotify 곡의 **트랙 ID 문자열만** 저장하고, 제목·커버 등 메타데이터는 DB에 보관하지 않습니다. 외부 테이블 FK가 아닌 단순 문자열입니다.
-- 호스트는 리뷰에 답글을 달 수 있습니다(`host_reply`).
+- 리뷰는 **별점과 음악만** 남깁니다. 둘 다 필수이고, 리뷰 글·사진·호스트 답글은 없습니다(V7 마이그레이션에서 제거).
+- 음악은 Spotify 곡의 **트랙 ID 문자열만** 저장하고, 제목·커버 등 메타데이터는 DB에 보관하지 않습니다. 외부 테이블 FK가 아닌 단순 문자열입니다.
+- 리뷰 목록은 최근순·별점 높은순·별점 낮은순 정렬과 별점 값 필터를 지원합니다(`idx_reviews_accommodation_rating`).
 - 찜은 회원과 숙소의 관계만 저장합니다.
 
 ### ERD
@@ -483,7 +484,6 @@ erDiagram
     RESERVATIONS ||--o| REVIEWS : one_stay_review
     USERS ||--o{ REVIEWS : writes
     ACCOMMODATIONS ||--o{ REVIEWS : reviewed_stay
-    REVIEWS ||--o{ REVIEW_IMAGES : photos
     USERS ||--o{ FAVORITES : bookmarks
     ACCOMMODATIONS ||--o{ FAVORITES : bookmarked
 
@@ -492,19 +492,10 @@ erDiagram
         bigint reservation_id FK, UK
         bigint accommodation_id FK
         bigint user_id FK
-        varchar spotify_track_id "Spotify 트랙 ID, NULL 허용"
+        varchar spotify_track_id "Spotify 트랙 ID, 필수"
         tinyint rating "1~5"
-        text content
-        text host_reply
-        datetime host_replied_at
         varchar status "VISIBLE, HIDDEN"
         datetime created_at
-    }
-    REVIEW_IMAGES {
-        bigint id PK
-        bigint review_id FK
-        varchar image_url
-        smallint sort_order
     }
     FAVORITES {
         bigint id PK
@@ -518,8 +509,7 @@ erDiagram
 
 | 테이블 | 역할 | 핵심 포인트 |
 |---|---|---|
-| `REVIEWS` | 투숙 리뷰 | 평점 1~5, 본문, 호스트 답글과 답글 시각, 노출 상태(VISIBLE/HIDDEN), 선택적 `spotify_track_id` |
-| `REVIEW_IMAGES` | 리뷰 사진 | `sort_order`로 노출 순서 |
+| `REVIEWS` | 투숙 리뷰 | 평점 1~5, 필수 `spotify_track_id`, 노출 상태(VISIBLE/HIDDEN). 글·사진·호스트 답글 없음 |
 | `FAVORITES` | 찜한 숙소 | `(user_id, accommodation_id)` 유니크. 같은 숙소를 중복해서 찜할 수 없음 |
 
 ### Spotify 연동 방식
@@ -527,7 +517,7 @@ erDiagram
 - **리뷰 작성**: 백엔드가 Spotify 검색 API를 호출해 결과를 프론트에 전달하고, 사용자가 고른 트랙의 ID만 저장합니다.
 - **리뷰 표시**: `https://open.spotify.com/embed/track/{spotify_track_id}` 공식 임베드 플레이어를 사용합니다. 제목·커버·재생은 Spotify가 직접 그립니다.
 - `preview_url`은 Spotify API에서 deprecated되어 사용하지 않습니다.
-- 리뷰 사진과 음악을 동기화해 자동 재생하는 연출은 Spotify 개발자 약관 위반 소지가 있어 하지 않습니다. 플레이어는 사용자가 직접 재생합니다.
+- 음악을 자동 재생하는 연출은 Spotify 개발자 약관 위반 소지가 있어 하지 않습니다. 플레이어는 사용자가 직접 재생합니다.
 - 출시 전 Spotify Developer Terms와 Design Guidelines를 한 번 확인해야 합니다.
 
 ---

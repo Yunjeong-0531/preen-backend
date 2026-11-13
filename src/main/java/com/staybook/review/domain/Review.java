@@ -16,7 +16,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * 투숙 리뷰. 예약 1건당 1개(reservation_id 유니크).
+ * 투숙 리뷰. 예약 1건당 1개(reservation_id 유니크). 별점과 음악만 남긴다.
  * 음악은 Spotify 트랙 ID 문자열만 저장하고 제목·아티스트·커버 같은 메타데이터는 저장하지 않는다.
  */
 @Entity
@@ -43,19 +43,11 @@ public class Review {
     @Column(nullable = false)
     private Long userId;
 
-    @Column(length = 64)
+    @Column(nullable = false, length = 64)
     private String spotifyTrackId;
 
     @Column(nullable = false, columnDefinition = "tinyint")
     private int rating;
-
-    @Column(nullable = false, columnDefinition = "text")
-    private String content;
-
-    @Column(columnDefinition = "text")
-    private String hostReply;
-
-    private LocalDateTime hostRepliedAt;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
@@ -66,14 +58,13 @@ public class Review {
     private LocalDateTime createdAt;
 
     public static Review create(Long reservationId, Long accommodationId, Long userId, String spotifyTrackId,
-                                int rating, String content, LocalDateTime now) {
+                                int rating, LocalDateTime now) {
         Review review = new Review();
         review.reservationId = reservationId;
         review.accommodationId = accommodationId;
         review.userId = userId;
         review.spotifyTrackId = spotifyTrackId;
         review.rating = rating;
-        review.content = content;
         review.status = Status.VISIBLE;
         review.createdAt = now;
         return review;
@@ -83,17 +74,7 @@ public class Review {
         this.rating = rating;
     }
 
-    public void changeContent(String content) {
-        this.content = content;
-    }
-
-    /** null을 주면 음악을 뗀다. */
     public void changeSpotifyTrackId(String spotifyTrackId) {
         this.spotifyTrackId = spotifyTrackId;
-    }
-
-    public void reply(String hostReply, LocalDateTime now) {
-        this.hostReply = hostReply;
-        this.hostRepliedAt = now;
     }
 }
