@@ -1,0 +1,76 @@
+name: CI
+
+# 브랜치에 push하면 테스트하고, master로 가는 PR도 테스트한다.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # 테스트 동안만 뜨는 MySQL·Redis. 외부에서 접근할 수 없으므로 비밀번호는 CI 전용 값이다.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root-ci
+          MYSQL_DATABASE: staybook_test
+          MYSQL_USER: staybook
+          MYSQL_PASSWORD: staybook-ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot-ci"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+
+    # CI에는 .env가 없으므로 접속 정보를 OS 환경 변수로 준다.
+    # JWT_SECRET, CRYPTO_* 는 build.gradle의 테스트 기본값이 채운다.
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: staybook          # build.gradle이 _test를 붙여 staybook_test로 접속한다
+      DB_USERNAME: staybook
+      DB_PASSWORD: staybook-ci
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # FlywayMigrationTest는 DB_NAME(staybook_test) 뒤에 _migration_test를 붙인 스키마를 쓴다.
+      - name: 마이그레이션 검증용 DB 만들기
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot-ci -e "
+            CREATE DATABASE IF NOT EXISTS staybook_test_migration_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            GRANT ALL PRIVILEGES ON staybook_test_migration_test.* TO 'staybook'@'%';"
+
+      # Windows에서 커밋한 gradlew에는 실행 권한이 없어 리눅스에서 바로 실행되지 않는다.
+      - name: gradlew 실행 권한
+        run: chmod +x gradlew
+
+      - name: 테스트
+        run: ./gradlew test
+
+      - name: 테스트 리포트 올리기
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: build/reports/tests/test
