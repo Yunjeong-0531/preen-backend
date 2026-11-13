@@ -23,6 +23,7 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
   mail:
     # MAIL_HOST가 비어 있으면 실제 발송 없이 동작한다 (발송 구현은 2단계 auth에서 연결).
     host: ${MAIL_HOST:}
